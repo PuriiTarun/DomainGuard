@@ -3,6 +3,7 @@ from domain_guard.checks.https import check_https
 from domain_guard.validation import is_valid_domain
 from domain_guard.network import check_public_dns
 from domain_guard.checks.tls import check_tls
+from domain_guard.checks.dns import check_dns
 
 def main():
     """Accept a domain and display its HTTPS connection status."""
@@ -58,5 +59,38 @@ def main():
 
     print(f"Details: {tls_result['message']}")
 
-    
+    print("\n--- DNS Records ---")
+
+    dns_result = check_dns(domain)
+
+    # Display DNS records returned by each lookup
+    for record_type, lookup in dns_result["records"].items():
+        if(lookup["status"] == "found"):
+            if(record_type == "TXT"):
+                print(f"TXT: {len(lookup['values'])} record(s) found")
+            else:
+                print(f"{record_type}:")
+                for value in lookup["values"]:
+                    print(f"  {value}")
+        elif(lookup["status"] == "missing"):
+            print(f"{record_type}: Not found")
+        else:
+            print(f"{record_type}: Lookup failed")
+
+    print("\n--- Email Authentication ---")
+
+    status_labels = {
+        "found": "Detected (not validated)",
+        "missing": "Not found",
+        "multiple": "Multiple records detected",
+        "error": "DNS lookup failed"
+    }
+
+    for record_type in ("spf", "dmarc"):
+        lookup = dns_result[record_type]
+        print(f"{record_type.upper()}: {status_labels[lookup['status']]}")
+
+        for value in lookup["values"]:
+            print(f"  {value}")
+
 main()
