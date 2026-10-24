@@ -32,7 +32,7 @@ def main():
     print(f"Target: {domain}")
     print("-------------------------")
 
-    result = check_https(domain)
+    result = check_https(domain, network_result["addresses"])
 
     if(result["success"]):
         print("HTTPS: CONNECTED")
