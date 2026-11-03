@@ -1,165 +1,109 @@
-
 <div align="center">
 
 # DomainGuard
 
-**Automated Website Security & Diagnostic Tool**
+**Website security configuration and DNS diagnostics**
 
-A Python command-line application for checking website connectivity and common security configuration issues.
+Python · FastAPI · React · TypeScript · pytest · Vite
 
-![Python](https://img.shields.io/badge/Python-171717?style=flat-square&logo=python&logoColor=white)
-![Requests](https://img.shields.io/badge/Requests-171717?style=flat-square)
-![pytest](https://img.shields.io/badge/pytest-171717?style=flat-square&logo=pytest&logoColor=white)
-![Status](https://img.shields.io/badge/Status-In_Development-555555?style=flat-square)
+**In active development · Local use only**
 
 </div>
 
 ---
 
-## Overview
+DomainGuard checks common website configuration signals including verified HTTPS connectivity, TLS certificate expiration, DNS records, SPF/DMARC presence, HTTP security headers, and HTTP-to-HTTPS redirects. The Python diagnostic modules power both the command-line tool and a local FastAPI API. The React UI renders only responses from that API.
 
-DomainGuard is a Python-based diagnostic tool designed to make routine website security and connectivity checks easier to perform.
+DomainGuard is **not a vulnerability scanner**. A missing header or email authentication declaration is not proof of an exploitable weakness.
 
-The project focuses on identifying common configuration issues, handling network errors, and presenting useful information about a website's technical setup.
+## Features
 
-DomainGuard is being developed as a practical command-line utility, with an emphasis on readable code, modular design, and automated testing.
+| Check | Current implementation |
+| --- | --- |
+| Target validation | Reject malformed domain names and DNS results containing non-public IPs |
+| HTTPS | Connect to a screened numeric IP and verify TLS for the original hostname |
+| TLS | Verify certificates, report expiration date and days remaining |
+| DNS | A, AAAA, MX, NS and TXT lookups |
+| SPF/DMARC | Detect records and duplicate declarations, not full policy evaluation |
+| Security headers | Inspect HSTS, CSP, nosniff, Referrer-Policy, Permissions-Policy and frame settings |
+| HTTP redirect | Inspect port 80 responses without following redirect destinations |
+| Local API | FastAPI POST /api/v1/scans, GET /health with Pydantic validation |
+| Web dashboard | Responsive dark/light UI, actual scan results, local browser history, JSON/Markdown downloads |
 
-## Current Features
+## Windows development setup
 
-| Feature | Description |
-|---------|-------------|
-| HTTPS connectivity | Establishes a verified HTTPS connection |
-| Certificate verification | Uses TLS certificate verification during HTTPS requests |
-| Domain validation | Rejects domains with invalid formats |
-| DNS address screening | Checks resolved IP addresses and rejects non-public results |
-| Error handling | Handles certificate failures, timeouts, and connection errors |
-| Automated testing | Uses pytest to verify expected results and failure cases |
-
-## Getting Started
-
-### Requirements
-
-- Python 3.12 or newer
-- Git
-- Internet access for live website checks
-
-### Installation
-
-Clone the repository:
-
-```bash
-git clone https://github.com/PuriiTarun/DomainGuard.git
-cd DomainGuard
-```
-
-Create a virtual environment:
-
-```bash
-python -m venv .venv
-```
-
-Install dependencies on Windows:
+Requirements: Python 3.12+, Node.js 22.12+, npm. From the repository root in PowerShell:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe -m pytest -q
 ```
 
-### Usage
-
-Run DomainGuard from the project directory:
+### CLI (still supported)
 
 ```powershell
 .\.venv\Scripts\python.exe main.py example.com
+.\.venv\Scripts\python.exe main.py example.com --format rich
+.\.venv\Scripts\python.exe main.py example.com --format json
 ```
 
-Example output:
+### API
 
-```text
-=== DomainGuard ===
-Target: example.com
--------------------------
-HTTPS: CONNECTED
-Status Code: 200
-Details: HTTPS connection successful
-```
-
-Actual results depend on the website and network conditions.
-
-## Automated Testing
-
-DomainGuard uses pytest to test its diagnostic functions without relying on live website connections.
-
-Install development dependencies:
+Start the Python backend in one terminal:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe -m uvicorn api.app:app --host 127.0.0.1 --port 8000
 ```
 
-Run the test suite:
+Check health using `Invoke-RestMethod http://127.0.0.1:8000/health`.
+
+The scan endpoint accepts JSON `{"domain":"example.com"}`. API documentation is available at `http://127.0.0.1:8000/docs` while the local server is running.
+
+### Frontend
+
+In a second PowerShell terminal:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest -v
+cd frontend
+npm install
+npm run dev
 ```
 
-The current test suite contains 28 passing test cases covering:
+Open `http://127.0.0.1:5173`. Vite proxies API requests to port 8000. In `frontend/`, run `npm test` and `npm run build` to verify the UI.
 
-- Successful HTTPS connections
-- TLS certificate verification errors
-- Connection timeouts and failures
-- Valid and invalid domain formats
-- Public and non-public IP address screening
-- DNS resolution failures
+Frontend installation and the production build were **not verified in the local authoring environment** because it could not download packages. Do not assume the dashboard is fully working until the GitHub CI checks and local tests succeed.
 
-Network responses are mocked so tests can run consistently without contacting external websites.
-
-## Project Structure
+## Architecture
 
 ```text
-DomainGuard/
-├── main.py
-├── domain_guard/
-│   ├── __init__.py
-│   ├── validation.py
-│   ├── network.py
-│   └── checks/
-│       ├── __init__.py
-│       └── https.py
-├── tests/
-│   ├── test_https.py
-│   ├── test_validation.py
-│   └── test_network.py
-├── requirements.txt
-├── requirements-dev.txt
-└── README.md
+frontend/            React, TypeScript, Vite, Tailwind
+api/                 FastAPI routes and Pydantic response models
+domain_guard/        Reusable Python diagnostics and scanner orchestration
+domain_guard/checks/ HTTPS, TLS, DNS, security headers and redirects
+main.py              CLI, including optional Rich and JSON formats
+tests/               Mocked Python tests
 ```
 
-Each module has a specific responsibility, making individual checks easier to maintain, improve, and test.
+The CLI and REST API use `domain_guard.scanner.scan_domain`. Individual failures remain separate and do not automatically count as successful findings. Scan history is stored only in the browser, with a maximum of 10 entries and a clear control. SQLite server-side history has not yet been implemented.
 
-## Planned Development
+## Security restrictions
 
-- TLS certificate details and expiration checks
-- DNS record inspection
-- SPF and DMARC analysis
-- HTTP security header checks
-- HTTP-to-HTTPS redirect analysis
-- Structured diagnostic reports
-- Improved terminal output
-- Additional automated tests
+- **Use locally only.** Do not expose the scanning API publicly until independent SSRF and abuse-resistance testing is complete.
+- Do not run against sites without authorization.
+- The HTTP and HTTPS checkers connect to screened numeric IPs. Redirect targets are inspected as text, not followed.
+- DNS resolution and request budgets still need a comprehensive security audit, including worst-case resolution delays and concurrency behaviour.
+- API rate limiting is process-local and not suitable for public multi-instance deployment.
+- API responses do not disclose cookies or arbitrary HTTP response headers.
+- SPF and DMARC checks identify declarations but do not fully validate policy or inheritance.
+- An unreachable or untested check is reported as unknown, never as a pass.
 
-## Security Considerations
+## Testing
 
-DomainGuard is intended for authorized website diagnostics and educational development.
+The audited repository baseline contained 56 pytest cases. This branch adds tests for headers, redirects, API validation, orchestration and CLI presentation. GitHub Actions runs the full Python suite and attempts the frontend tests and build on pull requests. Use CI output, not the README, to determine the current passing test total.
 
-The current DNS screening is a preliminary safeguard. It does not fully protect against DNS rebinding or address changes between validation and connection.
+An optional local Docker API configuration is provided; the Compose host port is pinned to `127.0.0.1:8000`.
 
-Until connection-time protections are implemented and verified, the application should only be used against controlled or explicitly authorized public targets.
+## Roadmap
 
-DomainGuard is not a comprehensive vulnerability scanner and does not establish that a website is secure.
-
----
-
-<div align="center">
-
-**Built with Python. Developed and tested incrementally.**
-
-</div>
+Remaining work includes strengthening DNS resolver time budgets, reviewing IP controls across all network paths, SQLite persistence if needed, deeper policy evaluation, and end-to-end frontend verification. No public deployment is planned until security review.

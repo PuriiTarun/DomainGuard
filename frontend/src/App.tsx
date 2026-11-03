@@ -147,8 +147,8 @@ export default function App() {
               </Card>
               <Card title="Email authentication">
                 <p className="mb-2 text-xs text-slate-500">Record detection only, not policy validation</p>
-                <Detail name="SPF" value={scan.dns.spf.status.toUpperCase()} tone={scan.dns.spf.status === 'found' ? 'good' : 'review'} detail={scan.dns.spf.values.join(', ') || 'No record returned'} />
-                <Detail name="DMARC" value={scan.dns.dmarc.status.toUpperCase()} tone={scan.dns.dmarc.status === 'found' ? 'good' : 'review'} detail={scan.dns.dmarc.values.join(', ') || 'No record returned'} />
+                <Detail name="SPF" value={scan.dns.spf.status.toUpperCase()} tone={scan.dns.spf.status === 'found' ? 'good' : scan.dns.spf.status === 'error' ? 'neutral' : 'review'} detail={scan.dns.spf.values.join(', ') || 'No record returned'} />
+                <Detail name="DMARC" value={scan.dns.dmarc.status.toUpperCase()} tone={scan.dns.dmarc.status === 'found' ? 'good' : scan.dns.dmarc.status === 'error' ? 'neutral' : 'review'} detail={scan.dns.dmarc.values.join(', ') || 'No record returned'} />
               </Card>
             </div>}
             {tab === 'dns' && <Card title="DNS records">

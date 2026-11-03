@@ -1,6 +1,7 @@
 """Command-line entry point for DomainGuard."""
 
 import argparse
+import json
 
 from domain_guard.scanner import scan_domain
 
@@ -11,12 +12,22 @@ def main():
         description="DomainGuard: Website Security Diagnostic Tool"
     )
     parser.add_argument("domain", help="Website domain to check (example.com)")
+    parser.add_argument("--format", choices=("text", "json", "rich"), default="text")
     args = parser.parse_args()
 
     try:
         result = scan_domain(args.domain)
     except ValueError as error:
         parser.error(str(error))
+
+    if args.format == "json":
+        print(json.dumps(result, indent=2))
+        return
+
+    if args.format == "rich":
+        from domain_guard.cli_rich import show_report
+        show_report(result)
+        return
 
     print("\n=== DomainGuard ===")
     print(f"Target: {result['domain']}")
