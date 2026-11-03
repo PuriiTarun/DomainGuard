@@ -64,3 +64,16 @@ def test_connection_error():
         assert result["success"] is False
         assert result["status_code"] is None
         assert result["message"] == "Could not connect to the website"
+
+def test_security_headers_exclude_cookies():
+    with patch("domain_guard.checks.https.urllib3.HTTPSConnectionPool") as mock_pool:
+        response = mock_pool.return_value.urlopen.return_value
+        response.status = 200
+        response.headers = {
+            "Strict-Transport-Security": "max-age=31536000",
+            "Content-Type": "text/html",
+            "Set-Cookie": "private-session=do-not-return"
+        }
+        result = check_https("example.com", ["8.8.8.8"])
+        assert result["headers"]["Strict-Transport-Security"] == "max-age=31536000"
+        assert "Set-Cookie" not in result["headers"]

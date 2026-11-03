@@ -1,6 +1,7 @@
 import ipaddress
 import ssl
 import urllib3
+from domain_guard.checks.headers import HEADERS as SECURITY_HEADERS
 
 def check_https(domain, addresses):
     """
@@ -63,10 +64,18 @@ def check_https(domain, addresses):
             assert_same_host=False
         )
 
+        # Read only security-related headers; never expose cookies.
+        found_headers = {}
+        for name in (*SECURITY_HEADERS, "Content-Type"):
+            value = response.headers.get(name)
+            if isinstance(value, str):
+                found_headers[name] = value[:4096]
+
         return {
             "success": True,
             "status_code": response.status,
-            "message": "HTTPS connection successful"
+            "message": "HTTPS connection successful",
+            "headers": found_headers
         }
 
     except (urllib3.exceptions.SSLError, ssl.SSLError):
