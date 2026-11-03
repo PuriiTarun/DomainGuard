@@ -66,3 +66,18 @@ def test_cors_is_not_wildcard():
         "access-control-request-method": "POST"
     })
     assert result.headers.get("access-control-allow-origin") is None
+
+
+def test_network_safety_rejection_returns_422():
+    from domain_guard.scanner import UnsafeTargetError
+    with patch("api.app.scan_domain", side_effect=UnsafeTargetError("Non-public IP address")):
+        response = client.post("/api/v1/scans", json={"domain": "example.com"})
+    assert response.status_code == 422
+    assert "Non-public" in response.json()["detail"]
+
+
+def test_api_rate_limit_prevents_scanner_execution():
+    with patch("api.app.limiter.allow", return_value=False), patch("api.app.scan_domain") as scanner:
+        response = client.post("/api/v1/scans", json={"domain": "example.com"})
+    assert response.status_code == 429
+    scanner.assert_not_called()

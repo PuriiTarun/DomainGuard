@@ -40,3 +40,23 @@ it('displays API failures without a fabricated scan', async () => {
   await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Too many scans'));
   expect(screen.queryByText('Connected')).not.toBeInTheDocument();
 });
+
+
+it('shows unknown mail record lookups as unknown, not passed', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => response }));
+  render(<App />);
+  fireEvent.change(screen.getByLabelText('Domain name'), { target: { value: 'example.com' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Run scan' }));
+  await waitFor(() => expect(screen.getByText('Connected')).toBeInTheDocument());
+  expect(screen.getByText('ERROR')).toBeInTheDocument();
+});
+
+it('shows real DNS results only after a scan', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => response }));
+  render(<App />);
+  fireEvent.change(screen.getByLabelText('Domain name'), { target: { value: 'example.com' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Run scan' }));
+  await waitFor(() => expect(screen.getByText('Connected')).toBeInTheDocument());
+  fireEvent.click(screen.getByRole('tab', { name: 'DNS' }));
+  expect(screen.getByText('8.8.8.8')).toBeInTheDocument();
+});

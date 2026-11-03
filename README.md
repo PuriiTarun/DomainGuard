@@ -1,14 +1,10 @@
-<div align="center">
+<h1 align="center">DomainGuard</h1>
 
-# DomainGuard
+<p align="center"><strong>Website security configuration and DNS diagnostics</strong></p>
+<p align="center">Python · FastAPI · React · TypeScript · pytest · Vite</p>
+<p align="center"><strong>In active development · Local use only</strong></p>
 
-**Website security configuration and DNS diagnostics**
-
-Python · FastAPI · React · TypeScript · pytest · Vite
-
-**In active development · Local use only**
-
-</div>
+<p align="center"><a href="https://github.com/PuriiTarun/DomainGuard/actions/workflows/ci.yml"><img alt="CI status" src="https://github.com/PuriiTarun/DomainGuard/actions/workflows/ci.yml/badge.svg"></a></p>
 
 ---
 
@@ -72,7 +68,7 @@ npm run dev
 
 Open `http://127.0.0.1:5173`. Vite proxies API requests to port 8000. In `frontend/`, run `npm test` and `npm run build` to verify the UI.
 
-Frontend installation and the production build were **not verified in the local authoring environment** because it could not download packages. Do not assume the dashboard is fully working until the GitHub CI checks and local tests succeed.
+GitHub Actions verified the TypeScript build and three frontend tests on Node.js 24. The scanner and browser still need a complete live end-to-end verification on Windows. Node.js 24 with npm 11 is recommended for frontend dependency installation.
 
 ## Architecture
 
@@ -100,7 +96,7 @@ The CLI and REST API use `domain_guard.scanner.scan_domain`. Individual failures
 
 ## Testing
 
-The audited repository baseline contained 56 pytest cases. This branch adds tests for headers, redirects, API validation, orchestration and CLI presentation. GitHub Actions runs the full Python suite and attempts the frontend tests and build on pull requests. Use CI output, not the README, to determine the current passing test total.
+The audited repository baseline contained 56 pytest cases. The first successful CI run for this branch verified **95 Python tests**, **3 React tests**, and a production frontend build. New tests also cover header and redirect findings, input validation, orchestration, and CLI output. Use the latest CI output as the source of truth for the current test count.
 
 An optional local Docker API configuration is provided; the Compose host port is pinned to `127.0.0.1:8000`.
 
