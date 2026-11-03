@@ -4,6 +4,8 @@ from domain_guard.validation import is_valid_domain
 from domain_guard.network import check_public_dns
 from domain_guard.checks.tls import check_tls
 from domain_guard.checks.dns import check_dns
+from domain_guard.checks.headers import check_security_headers
+from domain_guard.checks.redirects import check_http_redirect
 
 def main():
     """Accept a domain and display its HTTPS connection status."""
@@ -92,5 +94,18 @@ def main():
 
         for value in lookup["values"]:
             print(f"  {value}")
+
+    print("\n--- Security Headers ---")
+    header_result = check_security_headers(result)
+    if header_result["status"] == "checked":
+        for header, finding in header_result["checks"].items():
+            print(f"{header}: {finding['status'].upper()}")
+    else:
+        print(header_result["message"])
+
+    print("\n--- HTTP to HTTPS Redirect ---")
+    redirect_result = check_http_redirect(domain, network_result["addresses"])
+    print(f"Status: {redirect_result['status'].upper()}")
+    print(f"Details: {redirect_result['message']}")
 
 main()
