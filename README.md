@@ -78,6 +78,10 @@ Open `http://127.0.0.1:8000/` to explore the example report. The [user guide](do
 
 DomainGuard provides configuration observations, not a penetration test or security certification. Only assess domains you own or have permission to check. The public website always offers DNS and email observations. Limited website observations are available only when explicitly enabled server-side and quota permits; unavailable hosted checks do not invalidate DNS results.
 
+### License
+
+DomainGuard's original source code is available under the [MIT License](LICENSE), Copyright © 2026 Tarun Puri. The bundled Geist font remains under its separate [font license](domain_guard/static/Geist-LICENSE.txt).
+
 ---
 
 Developed by [Tarun Puri](https://github.com/PuriiTarun).
