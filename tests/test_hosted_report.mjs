@@ -9,10 +9,11 @@ const domain = "domainguard-check.vercel.app";
 const dns = {domain, scope: "dns-email", status: "complete", records: {A: {status: "found", values: ["1.1.1.1"]}}, checks: {https: {status: "skipped"}, tls: {status: "skipped"}, headers: {status: "skipped"}, redirects: {status: "skipped"}}, spf: {status: "missing"}};
 const probe = {domain, schema_version: 1, scope: "hosted-web-probe", status: "complete", addresses: ["1.1.1.1"], checks: {https: {status: "pass", status_code: 200}, tls: {status: "pass", expires: "2027-01-01", days_remaining: 40}, headers: {status: "warning", findings: [{name: "X-Content-Type-Options", status: "warning", message: "Missing"}]}, redirects: {status: "info"}}, records: {}};
 
-test("hosted probe is eligible only for fixed owner domain on a Vercel preview", () => {
+test("hosted probe is eligible for valid domains only on a Vercel preview", () => {
     assert.equal(canRequestHosted(domain, {protocol: "https:", hostname: "preview-123.vercel.app"}), true);
     assert.equal(canRequestHosted(domain, {protocol: "https:", hostname: domain}), false);
-    assert.equal(canRequestHosted("other.example.com", {protocol: "https:", hostname: "preview-123.vercel.app"}), false);
+    assert.equal(canRequestHosted("other.example.com", {protocol: "https:", hostname: "preview-123.vercel.app"}), true);
+    assert.equal(canRequestHosted("localhost", {protocol: "https:", hostname: "preview-123.vercel.app"}), false);
     assert.equal(canRequestHosted(domain, {protocol: "http:", hostname: "preview-123.vercel.app"}), false);
 });
 
@@ -35,6 +36,8 @@ test("invalid, mismatched and incomplete probe responses fail closed", () => {
     }
     assert.equal(mergeHosted(dns, {...probe, status: "incomplete"}).status, "incomplete");
     assert.equal(mergeHosted({...dns, status: "incomplete"}, probe).status, "incomplete");
+    const another = "other.example.com";
+    assert.equal(mergeHosted({...dns, domain: another}, {...probe, domain: another}).domain, another);
 });
 
 test("hosted request is bounded and denied responses stay unavailable", async () => {

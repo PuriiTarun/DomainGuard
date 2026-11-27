@@ -37,13 +37,20 @@ def main():
     status |= module("coverage", ["run", "--branch", "--source=domain_guard,main", "-m", "pytest", "-q"])
     if(not status):
         status |= module("coverage", ["report", "-m"])
-    for path in sorted((ROOT / "domain_guard/static").glob("*.mjs")):
+    javascript = [ROOT / "api/hosted-pilot.js"]
+    for directory in ("domain_guard/static", "domain_guard/static/api", "domain_guard/static/hosted-backend", "scripts"):
+        javascript.extend((ROOT / directory).glob("*.mjs"))
+        javascript.extend((ROOT / directory).glob("*.js"))
+    for path in sorted(javascript):
         status |= executable("node", ["--check", str(path)])
-    status |= executable("node", ["--test", *[str(path) for path in sorted((ROOT / "tests").glob("test_*.mjs"))]])
+    status |= executable("node", ["scripts/check-hosted-packaging.mjs"])
+    node_tests = sorted((ROOT / "tests").glob("test_*.mjs")) + sorted((ROOT / "domain_guard/hosted-sdk").glob("*.test.mjs"))
+    status |= executable("node", ["--test", *[str(path) for path in node_tests]])
     if(not args.offline_only):
         status |= run("Runtime dependencies", [sys.executable, "-c", "from domain_guard.runtime import require_runtime; require_runtime()"])
         status |= module("bandit", ["-q", "-r", "domain_guard", "main.py", "scripts", "-ll"])
         status |= executable("gitleaks", ["git", "--redact", "--no-banner", "."])
+        status |= executable("gitleaks", ["dir", "--redact", "--no-banner", "."])
         status |= executable("git", ["-c", "core.whitespace=cr-at-eol", "diff", "--check"])
         status |= executable("git", ["-c", "core.whitespace=cr-at-eol", "diff", "--cached", "--check"])
     raise SystemExit(1 if status else 0)

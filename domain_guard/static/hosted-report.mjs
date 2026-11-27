@@ -1,15 +1,14 @@
 import { normalizeDomain } from "./input.mjs";
 
-const PILOT_DOMAIN = "domainguard-check.vercel.app";
 const CHECKS = ["https", "tls", "headers", "redirects"];
 const STATES = new Set(["pass", "fail", "info", "warning", "unavailable", "incomplete"]);
 
 export function canRequestHosted(domain, site) {
-    return domain === PILOT_DOMAIN && site.protocol === "https:" && site.hostname.endsWith(".vercel.app") && site.hostname !== PILOT_DOMAIN;
+    return normalizeDomain(domain) === domain && site.protocol === "https:" && site.hostname.endsWith(".vercel.app") && site.hostname !== "domainguard-check.vercel.app";
 }
 
 export function mergeHosted(dns, probe) {
-    if(normalizeDomain(dns?.domain) !== PILOT_DOMAIN || probe?.domain !== dns.domain ||
+    if(normalizeDomain(dns?.domain) !== dns?.domain || probe?.domain !== dns.domain ||
        probe?.scope !== "hosted-web-probe" || probe?.schema_version !== 1 ||
        !["complete", "incomplete"].includes(probe?.status) || !Array.isArray(probe?.addresses) ||
        probe.addresses.length !== 1 || !probe.checks || typeof probe.checks !== "object" ||

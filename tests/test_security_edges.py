@@ -86,7 +86,7 @@ def test_failed_worker_never_exposes_error():
     finally:
         jobs.close()
 
-@pytest.mark.parametrize("returncode,output", [(1, b"error"), (0, b'{"domain":"other.com"}'), (0, b"x" * 65537)])
+@pytest.mark.parametrize("returncode,output", [(1, b"error"), (0, b'{"domain":"other.com"}'), (0, b"x" * 65537)], ids=["process-error", "wrong-domain", "oversized-output"])
 def test_invalid_worker_output_rejected(returncode, output):
     process = MagicMock()
     process.returncode = returncode

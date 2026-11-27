@@ -1,4 +1,6 @@
 .venv/
+node_modules/
+public/
 __pycache__/
 .pytest_cache/
 *.pyc

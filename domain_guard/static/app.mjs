@@ -37,7 +37,7 @@ async function loadMode() {
             publicDns = (await import("./public-dns.mjs")).scanPublicDns;
             liveEnabled = true;
             mode.textContent = "Live DNS and email checks";
-            document.getElementById("intro").textContent = "Check public DNS and email authentication records, with practical next steps. Website connections, certificates and headers require the local Python scanner, except for the fixed owner-domain pilot in a protected preview.";
+            document.getElementById("intro").textContent = "Check public DNS and email authentication records, with practical next steps. Website checks run only when the protected preview's hosted scanner is explicitly enabled; otherwise use the local Python scanner.";
             document.getElementById("resolver-notice").hidden = false;
             submit.disabled = false;
             buttonState("idle", "Check DNS ↗");
@@ -194,7 +194,7 @@ function setFilter(filter) {
 document.getElementById("filter-all").addEventListener("click", () => setFilter("all"));
 document.getElementById("filter-review").addEventListener("click", () => setFilter("review"));
 form.addEventListener("submit", runScan);
-cancel.addEventListener("click", () => { void cancelScan(); status.textContent = "Scan cancellation requested."; });
+cancel.addEventListener("click", () => { void cancelScan(); status.textContent = publicDns ? "Stopped waiting for this report. A hosted probe already started may finish within its time limit." : "Scan cancellation requested."; });
 demo.addEventListener("click", () => { if(active) return; showReport(demoReport, true); status.textContent = "Showing sample data. No live check was run."; });
 input.addEventListener("input", () => { if(!active) buttonState("idle", publicDns ? "Check DNS ↗" : "Check domain ↗"); });
 document.getElementById("print-report").addEventListener("click", () => {

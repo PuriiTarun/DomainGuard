@@ -27,8 +27,25 @@ test("pilot denies admission without explicit restricted ACL verification",async
     });
 });
 
+test("hosted route stays disabled without the preview activation flag",async()=>{
+    const config={VERCEL_ENV:"preview",DOMAIN_GUARD_PILOT:undefined,VERCEL_URL:"preview.vercel.app"};
+    await withConfig(config,async()=>{const res=response();await handler({method:"POST",headers:{},body:{}},res);assert.equal(res.code,404);});
+});
+
+test("arbitrary public hostname reaches the restricted credential gate",async()=>{
+    const config={VERCEL_ENV:"preview",DOMAIN_GUARD_PILOT:"1",VERCEL_URL:"preview.vercel.app",DOMAIN_GUARD_QUOTA_ACL_VERIFIED:undefined};
+    const req={method:"POST",headers:{origin:"https://preview.vercel.app","sec-fetch-site":"same-origin","content-type":"application/json","content-length":"30"},body:{domain:"other.example.com"}};
+    await withConfig(config,async()=>{const res=response();await handler(req,res);assert.equal(res.code,503);});
+});
+
 test("pilot rejects a standard token even with ACL flag",async()=>{
     const config={VERCEL_ENV:"preview",DOMAIN_GUARD_PILOT:"1",VERCEL_URL:"preview.vercel.app",DOMAIN_GUARD_QUOTA_TOKEN:"same-token",DOMAIN_GUARD_QUOTA_ACL_VERIFIED:"1",UPSTASH_REDIS_REST_TOKEN:"same-token"};
     const req={method:"POST",headers:{origin:"https://preview.vercel.app","sec-fetch-site":"same-origin","content-type":"application/json","content-length":"43"},body:{domain:"domainguard-check.vercel.app"}};
     await withConfig(config,async()=>{const res=response();await handler(req,res);assert.equal(res.code,503);});
+});
+
+test("pilot rejects unsafe hostnames before quota or sandbox use",async()=>{
+    const config={VERCEL_ENV:"preview",DOMAIN_GUARD_PILOT:"1",VERCEL_URL:"preview.vercel.app",DOMAIN_GUARD_QUOTA_TOKEN:"restricted-test-token",DOMAIN_GUARD_QUOTA_ACL_VERIFIED:"1",UPSTASH_REDIS_REST_TOKEN:undefined};
+    const req={method:"POST",headers:{origin:"https://preview.vercel.app","sec-fetch-site":"same-origin","content-type":"application/json","content-length":"32"},body:{domain:"localhost"}};
+    await withConfig(config,async()=>{const res=response();await handler(req,res);assert.equal(res.code,400);});
 });

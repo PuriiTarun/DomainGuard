@@ -133,10 +133,10 @@ test("hosted browser DNS mode submits to resolver only on explicit action", asyn
     } finally { globalThis.fetch = originalFetch; restore(); }
 });
 
-test("protected preview merges its fixed-domain hosted probe with DNS observations", async () => {
+test("protected preview merges arbitrary-domain hosted probe with DNS observations", async () => {
     const get = fixture();
     const originalFetch = globalThis.fetch;
-    const domain = "domainguard-check.vercel.app";
+    const domain = "example.org";
     globalThis.location = {protocol: "https:", hostname: "preview-123.vercel.app"};
     const requests = [];
     globalThis.fetch = async (url, options) => {

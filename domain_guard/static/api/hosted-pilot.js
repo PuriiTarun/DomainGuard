@@ -1,10 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { runPilot, GatewayError } from "../hosted-backend/gateway.mjs";
+import { runPilot, GatewayError, canonicalDomain } from "../hosted-backend/gateway.mjs";
 import { createQuota } from "../hosted-backend/quota.mjs";
 import { lookupApproved } from "../hosted-backend/resolve.mjs";
 
-const DOMAIN = "domainguard-check.vercel.app";
 const PATHS = ["domain_guard/hosted_probe.py","domain_guard/checks/headers.py","domain_guard/checks/redirects.py","domain_guard/validation.py"];
 
 export default async function handler(req,res) {
@@ -18,7 +17,7 @@ export default async function handler(req,res) {
         res.setHeader("Allow","POST");
         return res.status(405).json({error:"Use POST"});
     }
-    // Only the owner-controlled fixed domain is permitted in this preview.
+    // Protected preview and the disabled-by-default gate are required.
     if(req.headers.origin !== "https://" + process.env.VERCEL_URL ||
        req.headers["sec-fetch-site"] !== "same-origin" ||
        req.headers["content-type"] !== "application/json") {
@@ -27,8 +26,9 @@ export default async function handler(req,res) {
     if(req.headers["transfer-encoding"] || !/^[0-9]{1,3}$/.test(req.headers["content-length"] ?? "") || Number(req.headers["content-length"]) > 128) {
         return res.status(413).json({error:"Invalid request size"});
     }
-    if(!req.body || Object.keys(req.body).length !== 1 || req.body.domain !== DOMAIN) {
-        return res.status(400).json({error:"Pilot domain only"});
+    const domain = req.body?.domain;
+    if(!req.body || Object.keys(req.body).length !== 1 || !canonicalDomain(domain)) {
+        return res.status(400).json({error:"Enter a valid public hostname"});
     }
     // Never use the integration's unrestricted shared Redis credential.
     if(process.env.DOMAIN_GUARD_QUOTA_ACL_VERIFIED !== "1" || !process.env.DOMAIN_GUARD_QUOTA_TOKEN || process.env.DOMAIN_GUARD_QUOTA_TOKEN === process.env.UPSTASH_REDIS_REST_TOKEN) {
@@ -36,8 +36,8 @@ export default async function handler(req,res) {
     }
     try {
         const workerFiles = Object.fromEntries(await Promise.all(PATHS.map(async path=>[path,await readFile(join(process.cwd(),path))])));
-        const result = await runPilot(DOMAIN,{
-            authorize:async domain=>domain===DOMAIN,
+        const result = await runPilot(domain,{
+            authorize:async()=>true,
             reserve:createQuota({url:process.env.UPSTASH_REDIS_REST_URL,token:process.env.DOMAIN_GUARD_QUOTA_TOKEN}),
             lookupApproved,
             workerFiles,
