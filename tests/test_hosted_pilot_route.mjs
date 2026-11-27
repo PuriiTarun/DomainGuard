@@ -120,3 +120,28 @@ test("Sandbox provisioning and cleanup failures never return a successful report
     await withConfig({},async()=>assert.equal((await invoke(cleanup.handler)).code,503));
     assert.equal(cleanup.calls.stop,1);
 });
+
+test("bundled worker runs without runtime filesystem lookup",async()=>{
+    const seen=[];
+    let stopped=false;
+    const handler=createHandler({
+        quota:()=>async()=>true,
+        lookup:async()=> "1.1.1.1",
+        createSandbox:async()=>({
+            writeFiles:async files=>{seen.push(...files);},
+            runCommand:async()=>({exitCode:0,stdout:async()=>JSON.stringify(probe)}),
+            stop:async()=>{stopped=true;}
+        })
+    });
+    await withConfig({},async()=>{
+        const res=await invoke(handler);
+        assert.equal(res.code,200);
+        assert.deepEqual(res.body,probe);
+    });
+    assert.equal(seen.length,paths.length);
+    for(const path of paths) {
+        const file=seen.find(item=>item.path===path);
+        assert.ok(file && Buffer.isBuffer(file.content) && file.content.length>100);
+    }
+    assert.equal(stopped,true);
+});
