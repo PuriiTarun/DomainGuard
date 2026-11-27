@@ -1,6 +1,5 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { Sandbox } from "@vercel/sandbox";
 import { runPilot, GatewayError } from "../hosted-backend/gateway.mjs";
 import { createQuota } from "../hosted-backend/quota.mjs";
 import { lookupApproved } from "../hosted-backend/resolve.mjs";
@@ -38,7 +37,10 @@ export default async function handler(req,res) {
             reserve:createQuota({url:process.env.UPSTASH_REDIS_REST_URL,token:process.env.UPSTASH_REDIS_REST_TOKEN}),
             lookupApproved,
             workerFiles,
-            createSandbox:options=>Sandbox.create(options)
+            createSandbox:async options=>{
+                const {Sandbox}=await import("@vercel/sandbox");
+                return Sandbox.create(options);
+            }
         });
         return res.status(200).json(result);
     } catch(error) {
