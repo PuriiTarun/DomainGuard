@@ -5,4 +5,4 @@ useDefault = true
 
 [[allowlists]]
 description = "Installed project virtual environment is audited as dependencies"
-paths = ['''(^|[\\/])\.venv[\\/]''', '''(^|[\\/])node_modules[\\/]''', '''(^|[\\/])\.env\.local$''']
+paths = ['''(^|[\\/])\.venv[\\/]''', '''(^|[\\/])node_modules[\\/]''']

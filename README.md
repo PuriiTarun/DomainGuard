@@ -40,9 +40,9 @@ The original CLI had 56 passing Python tests. V2 adds a web interface, expanded 
 
 | Python tests | JavaScript tests | Python coverage |
 | :---: | :---: | :---: |
-| **317 passed** | **18 passed** | **92%** |
+| **317 passed** | **65 passed** | **92%** |
 
-<sub>Windows validation, November 27, 2026. Two Linux-specific tests skipped; coverage is rounded combined statement and branch coverage. Bandit (medium/high), Gitleaks and dependency audits reported no findings at the time of testing.</sub>
+<sub>Python baseline validated on Windows, November 27, 2026 (two Linux-specific tests skipped; rounded statement and branch coverage). The hosted-release JavaScript suite passed all 65 tests on November 27, 2026. Earlier Bandit and dependency audits reported no findings at the time of testing; current Git history was also inspected with Gitleaks.</sub>
 
 ### Get started
 
