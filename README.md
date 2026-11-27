@@ -4,6 +4,8 @@
 
 ### The project
 
+**[Try DomainGuard online](https://domainguard-check.vercel.app/)** (live DNS and email configuration checks).
+
 I started DomainGuard as a Python command-line tool to make it easier to check a domain's configuration. It has since grown into a local web application that helps website owners understand the settings behind their websites and email services without needing to know how DNS or security protocols work.
 
 Enter a domain name and DomainGuard collects public configuration information, explains what it finds and suggests practical next steps. The results are available through a browser or the command line.
