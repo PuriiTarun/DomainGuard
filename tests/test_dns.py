@@ -25,7 +25,7 @@ def test_a_records():
         result = lookup_records("example.com", "A")
         assert result["status"] == "found"
         assert result["values"] == ["93.184.215.14"]
-        mock_resolve.assert_called_once_with("example.com", "A", lifetime=5)
+        mock_resolve.assert_called_once_with("example.com", "A", lifetime=5, search=False)
 
 def test_txt_chunks():
     # Check that split TXT record segments are joined correctly
@@ -34,12 +34,24 @@ def test_txt_chunks():
         result = lookup_records("example.com", "TXT")
         assert result["values"] == ["v=spf1 include:mail.example.com -all"]
 
-@pytest.mark.parametrize("error", [dns.resolver.NoAnswer(), dns.resolver.NXDOMAIN()])
-def test_missing_records(error):
+def test_malformed_txt_answer_is_lookup_error():
+    with patch("domain_guard.checks.dns.dns.resolver.resolve") as mock_resolve:
+        mock_resolve.return_value = [FakeRecord("not a TXT record")]
+        result = lookup_records("example.com", "TXT")
+        assert result == {"status": "error", "values": []}
+
+def test_malformed_record_does_not_return_partial_values():
+    with patch("domain_guard.checks.dns.dns.resolver.resolve") as mock_resolve:
+        mock_resolve.return_value = [FakeRecord("93.184.215.14"), object()]
+        result = lookup_records("example.com", "A")
+        assert result == {"status": "error", "values": []}
+
+@pytest.mark.parametrize("error,status", [(dns.resolver.NoAnswer(), "missing"), (dns.resolver.NXDOMAIN(), "nxdomain")])
+def test_missing_records(error, status):
     with patch("domain_guard.checks.dns.dns.resolver.resolve") as mock_resolve:
         mock_resolve.side_effect = error
         result = lookup_records("example.com", "MX")
-        assert result["status"] == "missing"
+        assert result["status"] == status
 
 def test_dns_timeout():
     with patch("domain_guard.checks.dns.dns.resolver.resolve") as mock_resolve:
@@ -68,6 +80,11 @@ def test_spf_prefix_not_confused():
 
     result = check_email_record(lookup, "SPF")
     assert result["status"] == "missing"
+
+@pytest.mark.parametrize("value", ["v=spf1\t-all", " V=SPF1\n-all "])
+def test_spf_whitespace_delimiter(value):
+    result = check_email_record({"status": "found", "values": [value]}, "SPF")
+    assert result == {"status": "found", "values": [value]}
 
 def test_multiple_spf():
     lookup = {
@@ -121,6 +138,18 @@ def test_dns_checks_dmarc_location():
 
         result = check_dns("example.com")
         mock_lookup.assert_any_call("_dmarc.example.com", "TXT")
-        assert set(result["records"]) == {"A", "AAAA", "MX", "NS", "TXT"}
+        assert set(result["records"]) == {"A", "AAAA", "MX", "NS", "TXT", "CAA", "SOA"}
         assert result["spf"]["status"] == "missing"
         assert result["dmarc"]["status"] == "missing"
+
+def test_oversized_txt_is_error():
+    with patch("domain_guard.checks.dns.dns.resolver.resolve", return_value=[FakeTXT("x" * 2049)]):
+        assert lookup_records("example.com", "TXT")["status"] == "error"
+
+def test_dns_budget_exhausted_without_query():
+    with patch("domain_guard.checks.dns.dns.resolver.resolve") as resolve:
+        assert lookup_records("example.com", "A", lifetime=0)["status"] == "incomplete"
+    resolve.assert_not_called()
+
+def test_nxdomain_email_result():
+    assert check_email_record({"status": "nxdomain", "values": []}, "SPF")["status"] == "nxdomain"

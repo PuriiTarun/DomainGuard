@@ -15,15 +15,16 @@ def tls_mocks():
 def test_valid_certificate(tls_mocks):
     mock_connect, mock_context, tls_socket = tls_mocks
 
-    expiration = datetime.now(timezone.utc) + timedelta(days=60)
+    now = datetime(2030, 1, 1, tzinfo=timezone.utc)
+    expiration = now + timedelta(days=60)
     tls_socket.getpeercert.return_value = {
         "notAfter": expiration.strftime("%b %d %H:%M:%S %Y GMT")
     }
 
-    result = check_tls("example.com", ["8.8.8.8"])
+    result = check_tls("example.com", ["8.8.8.8"], now=now)
     assert result["valid"] is True
     assert result["expires"] == expiration.strftime("%Y-%m-%d")
-    assert 59 <= result["days_remaining"] <= 60
+    assert result["days_remaining"] == 60
     assert result["message"] == "TLS certificate verified"
 
     # Verify the connection uses the approved IP and original hostname
@@ -33,18 +34,17 @@ def test_valid_certificate(tls_mocks):
         server_hostname="example.com"
     )
 
-
 def test_certificate_expiring_soon(tls_mocks):
     _, _, tls_socket = tls_mocks
-    expiration = datetime.now(timezone.utc) + timedelta(days=10)
+    now = datetime(2030, 1, 1, tzinfo=timezone.utc)
+    expiration = now + timedelta(days=10)
     tls_socket.getpeercert.return_value = {
         "notAfter": expiration.strftime("%b %d %H:%M:%S %Y GMT")
     }
 
-    result = check_tls("example.com", ["8.8.8.8"])
+    result = check_tls("example.com", ["8.8.8.8"], now=now)
     assert result["valid"] is True
-    assert 0 <= result["days_remaining"] < 30
-
+    assert result["days_remaining"] == 10
 
 @pytest.mark.parametrize("addresses", [[], ["127.0.0.1"], ["8.8.8.8", "192.168.1.10"], ["not-an-ip"]])
 def test_rejected_addresses(addresses):
@@ -56,7 +56,7 @@ def test_rejected_addresses(addresses):
 
 def test_certificate_error(tls_mocks):
     _, mock_context, _ = tls_mocks
-    mock_context.return_value.wrap_socket.side_effect = ssl.SSLError()
+    mock_context.return_value.wrap_socket.side_effect = ssl.SSLCertVerificationError()
     result = check_tls("example.com", ["8.8.8.8"])
     assert result["valid"] is False
     assert result["message"] == "TLS certificate verification failed"
@@ -90,3 +90,39 @@ def test_connection_error(tls_mocks):
     result = check_tls("example.com", ["8.8.8.8"])
     assert result["valid"] is False
     assert result["message"] == "Could not inspect the TLS certificate"
+
+@pytest.mark.parametrize("domain", ["localhost", "example.com\x1b[31m", None])
+def test_invalid_host_never_connects(domain):
+    with patch("domain_guard.checks.tls.socket.create_connection") as mock_connect:
+        result = check_tls(domain, ["8.8.8.8"])
+    assert result["valid"] is False
+    assert result["message"] == "Invalid domain"
+    mock_connect.assert_not_called()
+
+def test_expired_certificate_never_reported_valid(tls_mocks):
+    _, _, tls_socket = tls_mocks
+    now = datetime(2030, 1, 1, tzinfo=timezone.utc)
+    tls_socket.getpeercert.return_value = {"notAfter": "Dec 31 23:59:59 2029 GMT"}
+    result = check_tls("example.com", ["8.8.8.8"], now=now)
+    assert result["valid"] is False
+    assert result["message"] == "TLS certificate expired"
+
+def test_deadline_exceeded_never_connects():
+    with patch("domain_guard.checks.tls.socket.create_connection") as connection:
+        result = check_tls("example.com", ["8.8.8.8"], timeout=0)
+    assert result["valid"] is False
+    connection.assert_not_called()
+
+def test_not_yet_valid_certificate(tls_mocks):
+    _, _, tls_socket = tls_mocks
+    now = datetime(2030, 1, 1, tzinfo=timezone.utc)
+    tls_socket.getpeercert.return_value = {"notBefore": "Jan 02 00:00:00 2030 GMT", "notAfter": "Feb 01 00:00:00 2030 GMT"}
+    result = check_tls("example.com", ["8.8.8.8"], now=now)
+    assert not result["valid"]
+    assert result["message"] == "TLS certificate not yet valid"
+
+def test_tls_protocol_error_is_not_certificate_failure(tls_mocks):
+    _, context, _ = tls_mocks
+    context.return_value.wrap_socket.side_effect = ssl.SSLError("Protocol failure")
+    result = check_tls("example.com", ["8.8.8.8"])
+    assert not result["valid"] and result["message"] == "TLS handshake failed"

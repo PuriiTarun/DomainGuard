@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "domainguard"
+version = "0.2.0"
+description = "A focused domain configuration assessment tool"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = ["urllib3>=2.8,<3", "dnspython>=2.9.2,<3"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent"
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=9,<10", "coverage>=7,<8", "bandit>=1.9,<2", "pip-audit>=2,<3", "cryptography>=46"]
+
+[project.scripts]
+domainguard = "main:main"
+domainguard-web = "domain_guard.web_api:main"
+
+[project.urls]
+Repository = "https://github.com/PuriiTarun/DomainGuard"
+
+[tool.setuptools]
+py-modules = ["main"]
+packages = ["domain_guard", "domain_guard.checks"]
+
+[tool.setuptools.package-data]
+domain_guard = ["static/*.html", "static/*.css", "static/*.mjs", "static/*.json", "static/*.woff2", "static/Geist-LICENSE.txt"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
