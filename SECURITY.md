@@ -4,7 +4,9 @@ DomainGuard checks public domain configuration. It does not test application vul
 
 ## Supported operation
 
-Use the local scanner only for authorized domains. The server binds to loopback and must not be exposed through a proxy, tunnel or public interface. The hosted DNS mode performs public DNS queries directly from the visitor's browser through a fixed external resolver; it does not contact the submitted website or expose a scanning backend. Full public live scanning is not supported by this version.
+Use DomainGuard only for domains you own, administer or have permission to assess. The full local Python scanner and its web API bind to loopback and must not be exposed through a proxy, tunnel or public interface.
+
+The public website performs DNS and email observations through Google Public DNS from the visitor's browser. When the production feature gate is enabled and quota permits, the hosted backend separately validates and resolves a submitted public hostname, reserves an atomic quota slot using a restricted credential, and runs one bounded HTTPS HEAD observation inside an isolated Vercel Sandbox with tightly restricted network egress. It verifies TLS and observes selected headers and redirects without following redirects or downloading response bodies. Hosted checks may be skipped or unavailable; the DNS report remains usable. This is not the full local scanner, a penetration test or a security certification.
 
 ## Reporting a vulnerability
 
