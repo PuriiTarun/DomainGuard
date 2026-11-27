@@ -155,7 +155,7 @@ test("protected preview merges its allowed-domain hosted probe with DNS observat
         await get("scan-form").handlers.submit({preventDefault() {}});
         assert.equal(requests.length, 11);
         assert.equal(requests.at(-1), "/api/hosted-pilot");
-        assert.equal(get("result-kind").textContent, "Protected preview: DNS and website observations");
+        assert.equal(get("result-kind").textContent, "DNS and website observations");
         assert.equal(get("summary-grid").children[2].children[1].textContent, "15");
         assert.match(get("scan-status").textContent, /DNS and website observations ready/);
     } finally { globalThis.fetch = originalFetch; restore(); }
