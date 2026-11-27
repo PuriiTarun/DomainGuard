@@ -178,7 +178,7 @@ test("denied hosted pilot keeps DNS-only result and skipped website checks", asy
         await get("scan-form").handlers.submit({preventDefault() {}});
         assert.equal(get("result-kind").textContent, "Live DNS and email observations");
         assert.match(get("result-subtitle").textContent, /were not assessed/);
-        assert.match(get("scan-status").textContent, /Website connection checks were not performed/);
+        assert.match(get("scan-status").textContent, /Website checks were unavailable or not attempted/);
     } finally { globalThis.fetch = originalFetch; restore(); }
 });
 
@@ -200,6 +200,6 @@ test("another domain in protected preview receives DNS-only results", async () =
         await get("scan-form").handlers.submit({preventDefault() {}});
         assert.equal(dnsRequests, 10);
         assert.equal(get("result-kind").textContent, "Live DNS and email observations");
-        assert.match(get("scan-status").textContent, /Website connection checks were not performed/);
+        assert.match(get("scan-status").textContent, /Website checks were unavailable or not attempted/);
     } finally { globalThis.fetch = originalFetch; restore(); }
 });
