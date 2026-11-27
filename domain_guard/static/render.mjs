@@ -43,7 +43,9 @@ export function describeReport(report) {
 function readCheck(value) {
     const item = value && typeof value === "object" ? value : {};
     const status = text(item.status, 32).toLowerCase();
-    const [label, kind] = Object.hasOwn(states, status) ? states[status] : ["Unavailable", "unknown"];
+    const [label, baseKind] = Object.hasOwn(states, status) ? states[status] : ["Unavailable", "unknown"];
+    const policyWarning = status === "found" && Array.isArray(item.findings) && item.findings.some(finding => finding?.status === "warning");
+    const kind = policyWarning ? "warning" : baseKind;
     const details = Array.isArray(item.values) ? item.values.slice(0, 30).map(v => text(v)) : [];
     if(Array.isArray(item.values) && item.values.length > 30) details.push(`${item.values.length - 30} more values in the JSON report`);
     if(item.message) details.unshift(text(item.message));
@@ -77,7 +79,8 @@ function plainOutcome(item) {
         return "No matching record was found at the name checked.";
     }
     if(item.kind === "problem") return "This check could not verify the expected configuration. Review the technical details.";
-    if(["Unavailable", "Incomplete", "Not assessed"].includes(item.label)) return "This check could not be completed. Its result is not known.";
+    if(item.label === "Not assessed") return "This check is outside the assessment scope. No result was measured.";
+    if(["Unavailable", "Incomplete"].includes(item.label)) return "This check could not be completed. Its result is not known.";
     if(item.kind === "warning") return "A configuration detail is worth reviewing; this is not proof of a vulnerability.";
     if(item.label === "Found") {
         if(item.key === "spf" || item.key === "dmarc") return "A published policy was found. This does not verify that email passes authentication.";
@@ -120,10 +123,11 @@ export function renderReport(report, synthetic = false, filter = "all") {
     const items = view.groups.flatMap(group => group.items);
     const actions = recommendations(report);
     addSummary(summary, "Suggested actions", actions.length);
-    addSummary(summary, "Checks shown", items.length);
+    const skipped = items.filter(item => item.label === "Not assessed").length;
+    addSummary(summary, "Checks attempted", items.length - skipped);
     const attention = items.filter(item => ["warning", "problem"].includes(item.kind)).length;
     const brief = attention ? `${attention} check${attention === 1 ? " has" : "s have"} warnings or failures. Start with the recommended actions.` : "No warning or failure was recorded in these checks. Review missing and unavailable results separately.";
-    document.getElementById("report-brief-text").textContent = brief;
+    document.getElementById("report-brief-text").textContent = brief + (skipped ? ` ${skipped} checks were outside the assessment scope.` : "");
     const visible = items.filter(item => filter !== "review" || ["warning", "problem"].includes(item.kind));
     document.getElementById("filter-status").textContent = `Showing ${visible.length} of ${items.length} checks${filter === "review" ? " with warnings or failures" : ""}.`;
     if(!visible.length) groups.append(element("p", "no-actions", "No warnings or failures in the selected checks. Review unavailable or missing results and the recommendations separately."));

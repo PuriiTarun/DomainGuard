@@ -63,3 +63,10 @@ test("invalid names, oversized replies, network errors and cancellation fail saf
     const error = await scanPublicDns("example.com", new AbortController().signal, async () => { throw Error("blocked"); });
     assert.equal(error.status, "incomplete");
 });
+
+test("published email policy warnings appear in the needs-review classification", async () => {
+    const {describeReport} = await import("../domain_guard/static/render.mjs");
+    const view = describeReport({domain: "example.com", spf: {status: "found", values: ["v=spf1 +all"], findings: [{status: "warning", name: "All mechanism", message: "Permissive policy"}]}});
+    assert.equal(view.groups[0].items[0].label, "Found");
+    assert.equal(view.groups[0].items[0].kind, "warning");
+});

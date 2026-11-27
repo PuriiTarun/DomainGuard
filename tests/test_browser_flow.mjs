@@ -123,6 +123,9 @@ test("hosted browser DNS mode submits to resolver only on explicit action", asyn
         assert.equal(requests.length, 10);
         assert.equal(get("result-kind").textContent, "Live DNS and email observations");
         assert.match(get("result-subtitle").textContent, /were not assessed/);
+        assert.match(get("report-brief-text").textContent, /4 checks were outside the assessment scope/);
+        assert.equal(get("summary-grid").children[2].children[0].textContent, "Checks attempted");
+        assert.equal(get("summary-grid").children[2].children[1].textContent, "11");
         assert.equal(get("scan-button").disabled, false);
         assert.equal(get("domain").readOnly, false);
         await get("scan-form").handlers.submit({preventDefault() {}});
