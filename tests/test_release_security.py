@@ -86,7 +86,8 @@ def test_new_public_assets_security_headers(endpoint, path):
     assert headers["Referrer-Policy"] == "no-referrer"
     assert "noindex" in headers["X-Robots-Tag"]
     assert "frame-ancestors 'none'" in headers["Content-Security-Policy"]
-    assert "unsafe-inline" not in headers["Content-Security-Policy"]
+    # Note: 'unsafe-inline' is now allowed in script-src for Vercel Web Analytics
+    assert "script-src 'self' 'unsafe-inline'" in headers["Content-Security-Policy"]
     assert "Set-Cookie" not in headers
 
 def test_rejected_body_can_arrive_after_response_headers(endpoint):
