@@ -4,7 +4,7 @@
 
 ### The project
 
-**[Try DomainGuard online](https://domainguard-check.vercel.app/)** (live DNS and email configuration checks).
+**[Try DomainGuard online](https://domainguard-check.vercel.app/)** (live DNS and email configuration checks; limited hosted HTTPS observations when enabled and within quota).
 
 I started DomainGuard as a Python command-line tool to make it easier to check a domain's configuration. It has since grown into a local web application that helps website owners understand the settings behind their websites and email services without needing to know how DNS or security protocols work.
 
@@ -32,7 +32,7 @@ Reports explain findings in plain language, with technical evidence available wh
 
 The assessment engine, command-line interface and local API are written in **Python**. The responsive website uses **HTML, CSS and JavaScript**, with no frontend framework or external runtime font service.
 
-The application validates domain input, screens resolved network addresses, verifies TLS connections and runs scans in bounded worker processes. Reports use private access credentials and expire after 15 minutes. The hosted DNS mode uses Google's public DNS-over-HTTPS service from the visitor's browser. The full Python assessment engine remains local-only.
+The application validates domain input, screens resolved network addresses, verifies TLS connections and runs scans in bounded worker processes. Reports use private access credentials and expire after 15 minutes. The hosted mode uses Google's public DNS-over-HTTPS service from the visitor's browser. A separately gated cloud mode can perform one bounded HTTPS HEAD observation through an isolated Vercel Sandbox when enabled and quota permits. The full Python assessment engine remains local-only.
 
 ### How it's progressed
 
@@ -76,7 +76,7 @@ Open `http://127.0.0.1:8000/` to explore the example report. The [user guide](do
 
 [Privacy notice](domain_guard/static/privacy.html) · [Terms of use](domain_guard/static/terms.html)
 
-DomainGuard provides configuration observations, not a penetration test or security certification. Only assess domains you own or have permission to check. The hosted site supports live DNS and email observations only. Full public HTTPS, TLS and header assessment requires separate infrastructure and security verification.
+DomainGuard provides configuration observations, not a penetration test or security certification. Only assess domains you own or have permission to check. The public website always offers DNS and email observations. Limited website observations are available only when explicitly enabled server-side and quota permits; unavailable hosted checks do not invalidate DNS results.
 
 ---
 

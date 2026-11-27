@@ -87,7 +87,7 @@ async function boundedJson(response) {
     } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
 }
 
-async function query(name, type, signal, request) {
+export async function query(name, type, signal, request) {
     if(name.length > 253 || signal.aborted) return empty("incomplete");
     const url = new URL("https://dns.google/resolve");
     url.search = new URLSearchParams({name, type: String(TYPES[type]), edns_client_subnet: "0.0.0.0/0"});

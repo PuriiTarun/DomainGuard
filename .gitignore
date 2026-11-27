@@ -1,4 +1,6 @@
 .venv/
+node_modules/
+public/
 __pycache__/
 .pytest_cache/
 *.pyc
@@ -8,3 +10,6 @@ dist/
 *.egg-info/
 .coverage
 htmlcov/
+
+.vercel
+.env*

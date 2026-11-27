@@ -116,10 +116,10 @@ export function renderReport(report, synthetic = false, filter = "all") {
     const groups = document.getElementById("result-groups");
     summary.replaceChildren();
     groups.replaceChildren();
-    document.getElementById("result-kind").textContent = synthetic ? "Example report (not a live scan)" : report?.scope === "dns-email" ? "Live DNS and email observations" : "Local scan result";
+    document.getElementById("result-kind").textContent = synthetic ? "Example report (not a live scan)" : report?.scope === "dns-email" ? "Live DNS and email observations" : report?.scope === "hosted-combined" ? "DNS and website observations" : "Local scan result";
     document.getElementById("results-title").textContent = view.domain || "Assessment results";
-    document.getElementById("result-subtitle").textContent = synthetic ? "Sample data for learning how to read the report." : report?.scope === "dns-email" ? "Public DNS observations via Google Public DNS. HTTPS, TLS, headers and redirects were not assessed." : "Configuration observed during this scan.";
-    addSummary(summary, report?.scope === "dns-email" && !synthetic ? "DNS assessment" : "Assessment", view.status === "complete" ? "Complete" : view.status === "rejected" ? "Rejected" : "Incomplete");
+    document.getElementById("result-subtitle").textContent = synthetic ? "Sample data for learning how to read the report." : report?.scope === "dns-email" ? "Public DNS observations via Google Public DNS. HTTPS, TLS, headers and redirects were not assessed." : report?.scope === "hosted-combined" ? "DNS observations from Google Public DNS; website observations from an isolated HTTPS HEAD probe of this domain." : "Configuration observed during this scan.";
+    addSummary(summary, report?.scope === "dns-email" && !synthetic ? "DNS assessment" : report?.scope === "hosted-combined" ? "Hosted assessment" : "Assessment", view.status === "complete" ? "Complete" : view.status === "rejected" ? "Rejected" : "Incomplete");
     const items = view.groups.flatMap(group => group.items);
     const actions = recommendations(report);
     addSummary(summary, "Suggested actions", actions.length);

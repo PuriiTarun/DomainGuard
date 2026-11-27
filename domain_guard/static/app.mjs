@@ -3,6 +3,7 @@ import { normalizeDomain } from "./input.mjs";
 import { renderReport } from "./render.mjs";
 import { exportReport } from "./report.mjs";
 import { actionDocument, reportFilename } from "./action-plan.mjs";
+import { canRequestHosted, mergeHosted, requestHosted } from "./hosted-report.mjs";
 
 const form = document.getElementById("scan-form");
 const input = document.getElementById("domain");
@@ -35,8 +36,8 @@ async function loadMode() {
         try {
             publicDns = (await import("./public-dns.mjs")).scanPublicDns;
             liveEnabled = true;
-            mode.textContent = "Live DNS and email checks";
-            document.getElementById("intro").textContent = "Check public DNS and email authentication records, with practical next steps. Website connections, certificates and headers require the local Python scanner.";
+            mode.textContent = location.hostname === "domainguard-check.vercel.app" ? "Live DNS and limited website checks" : "Live DNS and email checks";
+            document.getElementById("intro").textContent = location.hostname === "domainguard-check.vercel.app" ? "Check public DNS and email authentication records, plus HTTPS, TLS and security headers when scan capacity permits." : "Check public DNS and email settings; the protected pilot checks only DomainGuard's own hostname.";
             document.getElementById("resolver-notice").hidden = false;
             submit.disabled = false;
             buttonState("idle", "Check DNS ↗");
@@ -112,11 +113,23 @@ async function runPublicDns(domain) {
     document.getElementById("results").hidden = true;
     let completed = false;
     try {
-        const report = await publicDns(domain, active.signal);
+        let report = await publicDns(domain, active.signal);
+        if(active.signal.aborted) return;
+        let hosted = false;
+        if(canRequestHosted(domain, location)) {
+            status.textContent = "DNS complete. Checking website settings in an isolated worker.";
+            try {
+                report = mergeHosted(report, await requestHosted(domain, active.signal));
+                hosted = true;
+            } catch(cause) {
+                if(cause?.name === "AbortError") throw cause;
+                if(active.signal.aborted) return;
+            }
+        }
         if(active.signal.aborted) return;
         showReport(report, false);
         completed = true;
-        status.textContent = "DNS report ready. Website connection checks were not performed.";
+        status.textContent = hosted ? "DNS and website observations ready." : "DNS report ready. Website checks were unavailable or not attempted.";
         buttonState("done", "✓ Check again");
     } catch(error) {
         if(error.name !== "AbortError") status.textContent = "The DNS check could not be completed. Try again later.";
@@ -181,7 +194,7 @@ function setFilter(filter) {
 document.getElementById("filter-all").addEventListener("click", () => setFilter("all"));
 document.getElementById("filter-review").addEventListener("click", () => setFilter("review"));
 form.addEventListener("submit", runScan);
-cancel.addEventListener("click", () => { void cancelScan(); status.textContent = "Scan cancellation requested."; });
+cancel.addEventListener("click", () => { void cancelScan(); status.textContent = publicDns ? "Stopped waiting for this report. A hosted probe already started may finish within its time limit." : "Scan cancellation requested."; });
 demo.addEventListener("click", () => { if(active) return; showReport(demoReport, true); status.textContent = "Showing sample data. No live check was run."; });
 input.addEventListener("input", () => { if(!active) buttonState("idle", publicDns ? "Check DNS ↗" : "Check domain ↗"); });
 document.getElementById("print-report").addEventListener("click", () => {

@@ -132,3 +132,102 @@ test("hosted browser DNS mode submits to resolver only on explicit action", asyn
         assert.equal(requests.length, 10);
     } finally { globalThis.fetch = originalFetch; restore(); }
 });
+
+test("protected preview merges its allowed-domain hosted probe with DNS observations", async () => {
+    const get = fixture();
+    const originalFetch = globalThis.fetch;
+    const domain = "domainguard-check.vercel.app";
+    globalThis.location = {protocol: "https:", hostname: "preview-123.vercel.app"};
+    const requests = [];
+    globalThis.fetch = async (url, options) => {
+        requests.push(url);
+        if(url === "/api/hosted-pilot") {
+            assert.deepEqual(JSON.parse(options.body), {domain});
+            return new Response(JSON.stringify({domain, scope: "hosted-web-probe", schema_version: 1, status: "complete", addresses: ["1.1.1.1"], records: {}, checks: {https: {status: "pass", status_code: 200}, tls: {status: "pass", days_remaining: 40}, headers: {status: "info"}, redirects: {status: "info"}}}));
+        }
+        const target = new URL(url);
+        return new Response(JSON.stringify({Status: 0, TC: false, Question: [{name: target.searchParams.get("name") + ".", type: Number(target.searchParams.get("type"))}]}));
+    };
+    try {
+        const {ready} = await import("../domain_guard/static/app.mjs?hosted-pilot-flow-test");
+        await ready;
+        get("domain").value = domain;
+        await get("scan-form").handlers.submit({preventDefault() {}});
+        assert.equal(requests.length, 11);
+        assert.equal(requests.at(-1), "/api/hosted-pilot");
+        assert.equal(get("result-kind").textContent, "DNS and website observations");
+        assert.equal(get("summary-grid").children[2].children[1].textContent, "15");
+        assert.match(get("scan-status").textContent, /DNS and website observations ready/);
+    } finally { globalThis.fetch = originalFetch; restore(); }
+});
+
+test("denied hosted pilot keeps DNS-only result and skipped website checks", async () => {
+    const get = fixture();
+    const originalFetch = globalThis.fetch;
+    const domain = "domainguard-check.vercel.app";
+    globalThis.location = {protocol: "https:", hostname: "preview-456.vercel.app"};
+    globalThis.fetch = async url => {
+        if(url === "/api/hosted-pilot") return new Response("", {status: 503});
+        const target = new URL(url);
+        return new Response(JSON.stringify({Status: 0, TC: false, Question: [{name: target.searchParams.get("name") + ".", type: Number(target.searchParams.get("type"))}]}));
+    };
+    try {
+        const {ready} = await import("../domain_guard/static/app.mjs?hosted-pilot-denied-test");
+        await ready;
+        get("domain").value = domain;
+        await get("scan-form").handlers.submit({preventDefault() {}});
+        assert.equal(get("result-kind").textContent, "Live DNS and email observations");
+        assert.match(get("result-subtitle").textContent, /were not assessed/);
+        assert.match(get("scan-status").textContent, /Website checks were unavailable or not attempted/);
+    } finally { globalThis.fetch = originalFetch; restore(); }
+});
+
+test("another domain in protected preview receives DNS-only results", async () => {
+    const get = fixture();
+    const originalFetch = globalThis.fetch;
+    globalThis.location = {protocol: "https:", hostname: "preview-789.vercel.app"};
+    let dnsRequests = 0;
+    globalThis.fetch = async url => {
+        if(url === "/api/hosted-pilot") throw new Error("Unauthorized hosted request");
+        dnsRequests++;
+        const target = new URL(url);
+        return new Response(JSON.stringify({Status: 0, TC: false, Question: [{name: target.searchParams.get("name") + ".", type: Number(target.searchParams.get("type"))}]}));
+    };
+    try {
+        const {ready} = await import("../domain_guard/static/app.mjs?other-preview-domain-test");
+        await ready;
+        get("domain").value = "other.example.com";
+        await get("scan-form").handlers.submit({preventDefault() {}});
+        assert.equal(dnsRequests, 10);
+        assert.equal(get("result-kind").textContent, "Live DNS and email observations");
+        assert.match(get("scan-status").textContent, /Website checks were unavailable or not attempted/);
+    } finally { globalThis.fetch = originalFetch; restore(); }
+});
+
+test("public website combines another domain with hosted worker observations", async () => {
+    const get=fixture();
+    const previous=globalThis.fetch;
+    const domain="owner-approved.org";
+    globalThis.location={protocol:"https:",hostname:"domainguard-check.vercel.app"};
+    const requests=[];
+    globalThis.fetch=async (url,options) => {
+        requests.push(url);
+        if(url==="/api/hosted-pilot") {
+            assert.deepEqual(JSON.parse(options.body),{domain});
+            return new Response(JSON.stringify({domain,scope:"hosted-web-probe",schema_version:1,status:"complete",addresses:["1.1.1.1"],records:{},checks:{https:{status:"pass",status_code:200},tls:{status:"pass",days_remaining:30},headers:{status:"info"},redirects:{status:"info"}}}));
+        }
+        const target=new URL(url);
+        assert.equal(target.hostname,"dns.google");
+        return new Response(JSON.stringify({Status:0,TC:false,Question:[{name:target.searchParams.get("name")+".",type:Number(target.searchParams.get("type"))}]}));
+    };
+    try {
+        const {ready}=await import("../domain_guard/static/app.mjs?public-hosted-flow-test");
+        await ready;
+        get("domain").value=domain;
+        await get("scan-form").handlers.submit({preventDefault() {}});
+        assert.equal(requests.length,11);
+        assert.equal(get("result-kind").textContent,"DNS and website observations");
+        assert.match(get("scan-status").textContent,/DNS and website observations ready/);
+        assert.equal(get("scan-button").disabled,false);
+    } finally {globalThis.fetch=previous;restore();}
+});
