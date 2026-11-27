@@ -36,8 +36,8 @@ async function loadMode() {
         try {
             publicDns = (await import("./public-dns.mjs")).scanPublicDns;
             liveEnabled = true;
-            mode.textContent = "Live DNS and email checks";
-            document.getElementById("intro").textContent = "Check public DNS and email authentication records, with practical next steps. Website checks are limited to DomainGuard's own domain in an explicitly enabled protected pilot; otherwise use the local Python scanner.";
+            mode.textContent = location.hostname === "domainguard-check.vercel.app" ? "Live DNS and limited website checks" : "Live DNS and email checks";
+            document.getElementById("intro").textContent = location.hostname === "domainguard-check.vercel.app" ? "Check public DNS and email authentication records, plus HTTPS, TLS and security headers when scan capacity permits." : "Check public DNS and email settings; the protected pilot checks only DomainGuard's own hostname.";
             document.getElementById("resolver-notice").hidden = false;
             submit.disabled = false;
             buttonState("idle", "Check DNS ↗");
@@ -117,7 +117,7 @@ async function runPublicDns(domain) {
         if(active.signal.aborted) return;
         let hosted = false;
         if(canRequestHosted(domain, location)) {
-            status.textContent = "DNS complete. Checking website settings in the protected preview.";
+            status.textContent = "DNS complete. Checking website settings in an isolated worker.";
             try {
                 report = mergeHosted(report, await requestHosted(domain, active.signal));
                 hosted = true;
@@ -129,7 +129,7 @@ async function runPublicDns(domain) {
         if(active.signal.aborted) return;
         showReport(report, false);
         completed = true;
-        status.textContent = hosted ? "DNS and website observations ready." : "DNS report ready. Website connection checks were not performed.";
+        status.textContent = hosted ? "DNS and website observations ready." : "DNS report ready. Website checks were unavailable or not attempted.";
         buttonState("done", "✓ Check again");
     } catch(error) {
         if(error.name !== "AbortError") status.textContent = "The DNS check could not be completed. Try again later.";
