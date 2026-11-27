@@ -48,18 +48,49 @@ export function createHandler({loadFiles,quota=createQuota,lookup=lookupApproved
         if(process.env.DOMAIN_GUARD_QUOTA_ACL_VERIFIED !== "1" || !process.env.DOMAIN_GUARD_QUOTA_TOKEN || process.env.DOMAIN_GUARD_QUOTA_TOKEN === process.env.UPSTASH_REDIS_REST_TOKEN) {
             return res.status(503).json({error:"Restricted quota credential required"});
         }
+        let phase = "worker-files";
         try {
             const workerFiles = await files();
+            phase = "quota-setup";
+            const reserve = quota({url:process.env.UPSTASH_REDIS_REST_URL,token:process.env.DOMAIN_GUARD_QUOTA_TOKEN});
+            phase = "admission";
             const result = await runPilot(domain,{
                 authorize:async candidate=>allowed === PILOT_DOMAIN && candidate === PILOT_DOMAIN,
-                reserve:quota({url:process.env.UPSTASH_REDIS_REST_URL,token:process.env.DOMAIN_GUARD_QUOTA_TOKEN}),
-                lookupApproved:lookup,
+                reserve:async()=>{
+                    phase = "quota-reservation";
+                    return reserve();
+                },
+                lookupApproved:async candidate=>{
+                    phase = "dns-resolution";
+                    return lookup(candidate);
+                },
                 workerFiles,
-                createSandbox:sandbox
+                createSandbox:async options=>{
+                    phase = "sandbox-create";
+                    const instance = await sandbox(options);
+                    return {
+                        writeFiles:async(...args)=>{
+                            phase = "sandbox-write";
+                            return instance.writeFiles(...args);
+                        },
+                        runCommand:async(...args)=>{
+                            phase = "worker-command";
+                            return instance.runCommand(...args);
+                        },
+                        stop:async(...args)=>{
+                            phase = "sandbox-cleanup";
+                            return instance.stop(...args);
+                        }
+                    };
+                }
             });
             return res.status(200).json(result);
         } catch(error) {
             const status=error instanceof GatewayError?error.status:503;
+            // Log only fixed stage labels and sanitized error types; never credentials or request data.
+            const errorName = error instanceof Error && /^[a-zA-Z]{1,40}$/.test(error.name) ? error.name : "Unknown";
+            const errorCode = typeof error?.code === "string" && /^[A-Z0-9_]{1,40}$/.test(error.code) ? error.code : "none";
+            console.error("DOMAIN_GUARD_PILOT_FAILURE", JSON.stringify({status,phase,errorName,errorCode}));
             return res.status(status).json({error:"Pilot scan unavailable or declined"});
         }
     };
