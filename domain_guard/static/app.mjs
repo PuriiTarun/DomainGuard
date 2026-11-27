@@ -37,7 +37,7 @@ async function loadMode() {
             publicDns = (await import("./public-dns.mjs")).scanPublicDns;
             liveEnabled = true;
             mode.textContent = "Live DNS and email checks";
-            document.getElementById("intro").textContent = "Check public DNS and email authentication records, with practical next steps. Website checks run only when the protected preview's hosted scanner is explicitly enabled; otherwise use the local Python scanner.";
+            document.getElementById("intro").textContent = "Check public DNS and email authentication records, with practical next steps. Website checks are limited to DomainGuard's own domain in an explicitly enabled protected pilot; otherwise use the local Python scanner.";
             document.getElementById("resolver-notice").hidden = false;
             submit.disabled = false;
             buttonState("idle", "Check DNS ↗");

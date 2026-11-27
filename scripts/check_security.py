@@ -23,6 +23,19 @@ def executable(name, args):
         return 1
     return run(name, [name, *args])
 
+def tracked_local_secrets():
+    result = subprocess.run(["git", "ls-files", "-z"], cwd=ROOT, capture_output=True, check=False)
+    if(result.returncode):
+        print("Tracked local secrets: Git inventory unavailable", flush=True)
+        return 1
+    names = [name.decode("utf-8", "replace") for name in result.stdout.split(b"\0") if name]
+    exposed = [name for name in names if any(part.startswith(".env") or part in (".vercel", ".venv", "node_modules") for part in Path(name).parts)]
+    if(exposed):
+        print("Tracked local secrets or installed dependencies: " + ", ".join(exposed), flush=True)
+        return 1
+    print("Tracked local secrets: none", flush=True)
+    return 0
+
 def main():
     parser = argparse.ArgumentParser(description="Run DomainGuard verification")
     parser.add_argument("--offline-only", action="store_true", help="Run tests and coverage without security scanners")
@@ -49,6 +62,7 @@ def main():
     if(not args.offline_only):
         status |= run("Runtime dependencies", [sys.executable, "-c", "from domain_guard.runtime import require_runtime; require_runtime()"])
         status |= module("bandit", ["-q", "-r", "domain_guard", "main.py", "scripts", "-ll"])
+        status |= tracked_local_secrets()
         status |= executable("gitleaks", ["git", "--redact", "--no-banner", "."])
         status |= executable("gitleaks", ["dir", "--redact", "--no-banner", "."])
         status |= executable("git", ["-c", "core.whitespace=cr-at-eol", "diff", "--check"])

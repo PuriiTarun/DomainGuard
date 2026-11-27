@@ -32,7 +32,7 @@ Reports explain findings in plain language, with technical evidence available wh
 
 The assessment engine, command-line interface and local API are written in **Python**. The responsive website uses **HTML, CSS and JavaScript**, with no frontend framework or external runtime font service.
 
-The application validates domain input, screens resolved network addresses, verifies TLS connections and runs scans in bounded worker processes. Reports use private access credentials and expire after 15 minutes. The production hosted mode uses Google's public DNS-over-HTTPS service from the visitor's browser. A protected-preview server route for bounded website checks of validated public domains is implemented but disabled pending live ACL, quota and network-isolation verification. The full Python assessment engine remains local-only.
+The application validates domain input, screens resolved network addresses, verifies TLS connections and runs scans in bounded worker processes. Reports use private access credentials and expire after 15 minutes. The production hosted mode uses Google's public DNS-over-HTTPS service from the visitor's browser. A disabled-by-default protected-preview pilot can perform bounded website checks only for domainguard-check.vercel.app after explicit server configuration. The full Python assessment engine remains local-only.
 
 ### How it's progressed
 

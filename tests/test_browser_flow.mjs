@@ -133,10 +133,10 @@ test("hosted browser DNS mode submits to resolver only on explicit action", asyn
     } finally { globalThis.fetch = originalFetch; restore(); }
 });
 
-test("protected preview merges arbitrary-domain hosted probe with DNS observations", async () => {
+test("protected preview merges its allowed-domain hosted probe with DNS observations", async () => {
     const get = fixture();
     const originalFetch = globalThis.fetch;
-    const domain = "example.org";
+    const domain = "domainguard-check.vercel.app";
     globalThis.location = {protocol: "https:", hostname: "preview-123.vercel.app"};
     const requests = [];
     globalThis.fetch = async (url, options) => {
@@ -178,6 +178,28 @@ test("denied hosted pilot keeps DNS-only result and skipped website checks", asy
         await get("scan-form").handlers.submit({preventDefault() {}});
         assert.equal(get("result-kind").textContent, "Live DNS and email observations");
         assert.match(get("result-subtitle").textContent, /were not assessed/);
+        assert.match(get("scan-status").textContent, /Website connection checks were not performed/);
+    } finally { globalThis.fetch = originalFetch; restore(); }
+});
+
+test("another domain in protected preview receives DNS-only results", async () => {
+    const get = fixture();
+    const originalFetch = globalThis.fetch;
+    globalThis.location = {protocol: "https:", hostname: "preview-789.vercel.app"};
+    let dnsRequests = 0;
+    globalThis.fetch = async url => {
+        if(url === "/api/hosted-pilot") throw new Error("Unauthorized hosted request");
+        dnsRequests++;
+        const target = new URL(url);
+        return new Response(JSON.stringify({Status: 0, TC: false, Question: [{name: target.searchParams.get("name") + ".", type: Number(target.searchParams.get("type"))}]}));
+    };
+    try {
+        const {ready} = await import("../domain_guard/static/app.mjs?other-preview-domain-test");
+        await ready;
+        get("domain").value = "other.example.com";
+        await get("scan-form").handlers.submit({preventDefault() {}});
+        assert.equal(dnsRequests, 10);
+        assert.equal(get("result-kind").textContent, "Live DNS and email observations");
         assert.match(get("scan-status").textContent, /Website connection checks were not performed/);
     } finally { globalThis.fetch = originalFetch; restore(); }
 });
