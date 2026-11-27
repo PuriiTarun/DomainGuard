@@ -60,7 +60,7 @@ The local server binds only to IPv4 loopback, requires its exact host and reject
 
 Local HTTP connections have an absolute deadline and total request-size budget. On Linux, workers additionally limit address space, CPU time, open file descriptors and core dumps. Other platforms retain wall-clock and output limits; process resource limits are not claimed there.
 
-Process separation is not a network sandbox. Local Python scans are disabled by default and in production mode. The separate browser-based [hosted DNS mode](hosted.md) does not run the Python scanner. See [SECURITY.md](../SECURITY.md) for supported operation and vulnerability reporting.
+Process separation is not a network sandbox. Local full Python scans are disabled by default and never exposed as the production hosted API. The public [hosted mode](hosted.md) performs browser-side DNS and email observations and can run a separate, limited Python HTTPS HEAD worker inside an isolated Vercel Sandbox when production admission gates and quota permit. The hosted worker uses screened public IPs, pinned egress and strict output limits; it does not provide the complete local scanner. See [SECURITY.md](../SECURITY.md) for supported operation and vulnerability reporting.
 
 ## Source layout
 
