@@ -1,15 +1,13 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { runPilot, GatewayError, canonicalDomain } from "../hosted-backend/gateway.mjs";
 import { createQuota } from "../hosted-backend/quota.mjs";
 import { lookupApproved } from "../hosted-backend/resolve.mjs";
+import { EMBEDDED_WORKERS } from "../hosted-backend/embedded-workers.mjs";
 
-const PATHS = ["domain_guard/hosted_probe.py","domain_guard/checks/headers.py","domain_guard/checks/redirects.py","domain_guard/validation.py"];
 const PILOT_DOMAIN = "domainguard-check.vercel.app";
 const PREVIEW_HOST = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.vercel\.app$/;
 
 export function createHandler({loadFiles,quota=createQuota,lookup=lookupApproved,createSandbox}={}) {
-    const files = loadFiles ?? (async()=>Object.fromEntries(await Promise.all(PATHS.map(async path=>[path,await readFile(join(process.cwd(),path))]))));
+    const files = loadFiles ?? (async()=>EMBEDDED_WORKERS);
     const sandbox = createSandbox ?? (async options=>{
         const {Sandbox}=await import("@vercel/sandbox");
         return Sandbox.create(options);
