@@ -30,11 +30,15 @@ export default async function handler(req,res) {
     if(!req.body || Object.keys(req.body).length !== 1 || req.body.domain !== DOMAIN) {
         return res.status(400).json({error:"Pilot domain only"});
     }
+    // Never use the integration's unrestricted shared Redis credential.
+    if(!process.env.DOMAIN_GUARD_QUOTA_TOKEN || process.env.DOMAIN_GUARD_QUOTA_TOKEN === process.env.UPSTASH_REDIS_REST_TOKEN) {
+        return res.status(503).json({error:"Restricted quota credential required"});
+    }
     try {
         const workerFiles = Object.fromEntries(await Promise.all(PATHS.map(async path=>[path,await readFile(join(process.cwd(),path))])));
         const result = await runPilot(DOMAIN,{
             authorize:async domain=>domain===DOMAIN,
-            reserve:createQuota({url:process.env.UPSTASH_REDIS_REST_URL,token:process.env.UPSTASH_REDIS_REST_TOKEN}),
+            reserve:createQuota({url:process.env.UPSTASH_REDIS_REST_URL,token:process.env.DOMAIN_GUARD_QUOTA_TOKEN}),
             lookupApproved,
             workerFiles,
             createSandbox:async options=>{
