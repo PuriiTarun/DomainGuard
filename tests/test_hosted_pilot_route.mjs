@@ -22,7 +22,7 @@ function request(domain=DOMAIN) {
 }
 
 async function withConfig(overrides,run) {
-    const config={VERCEL_ENV:"preview",VERCEL_URL:HOST,DOMAIN_GUARD_PILOT:"1",DOMAIN_GUARD_PILOT_ALLOWLIST:DOMAIN,
+    const config={VERCEL_ENV:"preview",VERCEL_URL:HOST,DOMAIN_GUARD_PILOT:"1",DOMAIN_GUARD_PUBLIC:undefined,DOMAIN_GUARD_PILOT_ALLOWLIST:DOMAIN,
         DOMAIN_GUARD_QUOTA_ACL_VERIFIED:"1",DOMAIN_GUARD_QUOTA_TOKEN:"restricted-test-token",UPSTASH_REDIS_REST_TOKEN:"different-standard-token",UPSTASH_REDIS_REST_URL:"https://test.upstash.io",...overrides};
     const prior=Object.fromEntries(Object.keys(config).map(key=>[key,process.env[key]]));
     try {
@@ -144,4 +144,53 @@ test("bundled worker runs without runtime filesystem lookup",async()=>{
         assert.ok(file && Buffer.isBuffer(file.content) && file.content.length>100);
     }
     assert.equal(stopped,true);
+});
+
+function productionRequest(domain=DOMAIN) {
+    const req=request(domain);
+    return {...req,headers:{...req.headers,host:DOMAIN,origin:"https://"+DOMAIN}};
+}
+
+test("production public endpoint remains disabled without explicit opt-in",async()=>{
+    const {handler,calls}=services();
+    await withConfig({VERCEL_ENV:"production",DOMAIN_GUARD_PUBLIC:undefined},async()=>{
+        assert.equal((await invoke(handler,productionRequest())).code,404);
+    });
+    assert.equal(calls.files+calls.quota+calls.dns+calls.sandbox,0);
+});
+
+test("production accepts validated public domains only behind quota and pinned sandbox",async()=>{
+    const target="owner-approved.org";
+    const output={...probe,domain:target};
+    const {handler,calls}=services({output});
+    await withConfig({VERCEL_ENV:"production",DOMAIN_GUARD_PUBLIC:"1",DOMAIN_GUARD_PILOT:undefined,DOMAIN_GUARD_PILOT_ALLOWLIST:undefined},async()=>{
+        const res=await invoke(handler,productionRequest(target));
+        assert.equal(res.code,200);
+        assert.deepEqual(res.body,output);
+    });
+    assert.deepEqual(calls,{files:1,quota:1,dns:1,sandbox:1,stop:1});
+});
+
+test("public production rejects forged origin, forbidden names and absent restricted quota",async()=>{
+    const {handler,calls}=services();
+    await withConfig({VERCEL_ENV:"production",DOMAIN_GUARD_PUBLIC:"1"},async()=>{
+        const badOrigin=productionRequest();
+        badOrigin.headers.origin="https://other.vercel.app";
+        assert.equal((await invoke(handler,badOrigin)).code,403);
+        assert.equal((await invoke(handler,productionRequest("localhost"))).code,400);
+        assert.equal((await invoke(handler,productionRequest("metadata.google.internal"))).code,400);
+        assert.equal((await invoke(handler,productionRequest("127.0.0.1"))).code,400);
+    });
+    await withConfig({VERCEL_ENV:"production",DOMAIN_GUARD_PUBLIC:"1",DOMAIN_GUARD_QUOTA_ACL_VERIFIED:undefined},async()=>{
+        assert.equal((await invoke(handler,productionRequest())).code,503);
+    });
+    assert.equal(calls.quota+calls.dns+calls.sandbox,0);
+});
+
+test("public production refuses scanning when global quota is exhausted",async()=>{
+    const {handler,calls}=services({quota:false});
+    await withConfig({VERCEL_ENV:"production",DOMAIN_GUARD_PUBLIC:"1"},async()=>{
+        assert.equal((await invoke(handler,productionRequest())).code,429);
+    });
+    assert.equal(calls.dns+calls.sandbox,0);
 });
