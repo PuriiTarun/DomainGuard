@@ -1,6 +1,6 @@
 import { BlockList, isIP } from "node:net";
 import { canonicalDomain, publicIPv4 } from "./gateway.mjs";
-import { query } from "../public-dns.mjs";
+import { query } from "../static/public-dns.mjs";
 
 const permitted = new BlockList();
 permitted.addSubnet("2000::",3,"ipv6");

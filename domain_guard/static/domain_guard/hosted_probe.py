@@ -71,8 +71,10 @@ def probe(domain, address):
     skipped = {"status": "unavailable", "message": "Check could not be completed"}
     checks = {key: skipped.copy() for key in ("https", "tls", "headers", "redirects")}
     # This Linux worker runs once per sandbox; an absolute deadline covers slow trickles.
-    previous = signal.signal(signal.SIGALRM, deadline)
-    signal.setitimer(signal.ITIMER_REAL, SCAN_SECONDS)
+    has_alarm = hasattr(signal, "SIGALRM") and hasattr(signal, "setitimer")
+    if(has_alarm):
+        previous = signal.signal(signal.SIGALRM, deadline)
+        signal.setitimer(signal.ITIMER_REAL, SCAN_SECONDS)
     try:
         context = ssl.create_default_context()
         context.hostname_checks_common_name = False
@@ -98,8 +100,9 @@ def probe(domain, address):
     except (OSError, ValueError, KeyError):
         pass
     finally:
-        signal.setitimer(signal.ITIMER_REAL, 0)
-        signal.signal(signal.SIGALRM, previous)
+        if(has_alarm):
+            signal.setitimer(signal.ITIMER_REAL, 0)
+            signal.signal(signal.SIGALRM, previous)
     status = "incomplete" if any(item["status"] in ("unavailable", "incomplete") for item in checks.values()) else "complete"
     return {"domain": domain, "schema_version": 1, "scope": "hosted-web-probe", "status": status, "addresses": [address], "checks": checks, "records": {}}
 

@@ -29,3 +29,20 @@ test("outage, malformed body, quota reached, oversized and wrong type fail close
     }
     assert.equal(await createQuota({...config,fetcher:async()=>{throw Error("timeout");}})(),false);
 });
+test("concurrent callers rely on independent provider reservations",async()=>{
+    let calls=0;
+    const reserve=createQuota({...config,fetcher:async()=>{
+        const call=++calls;
+        await new Promise(resolve=>setImmediate(resolve));
+        return Response.json({result:call===6?1:0});
+    }});
+    const admitted=await Promise.all(Array.from({length:8},()=>reserve()));
+    assert.equal(admitted.filter(Boolean).length,1);
+    assert.equal(calls,8);
+});
+test("empty and non-object responses deny admission",async()=>{
+    for(const body of ["", "null", "[]", "true", "{\"result\":2}"]){
+        const reserve=createQuota({...config,fetcher:async()=>new Response(body)});
+        assert.equal(await reserve(),false);
+    }
+});

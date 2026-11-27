@@ -1,6 +1,5 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { Sandbox } from "@vercel/sandbox";
 import { runPilot, GatewayError } from "../domain_guard/hosted-sdk/gateway.mjs";
 import { createQuota } from "../domain_guard/hosted-sdk/quota.mjs";
 import { lookupApproved } from "../domain_guard/hosted-sdk/resolve.mjs";
@@ -32,7 +31,7 @@ export default async function handler(req,res) {
         return res.status(400).json({error:"Pilot domain only"});
     }
     // Never use the integration's unrestricted shared Redis credential.
-    if(!process.env.DOMAIN_GUARD_QUOTA_TOKEN || process.env.DOMAIN_GUARD_QUOTA_TOKEN === process.env.UPSTASH_REDIS_REST_TOKEN) {
+    if(process.env.DOMAIN_GUARD_QUOTA_ACL_VERIFIED !== "1" || !process.env.DOMAIN_GUARD_QUOTA_TOKEN || process.env.DOMAIN_GUARD_QUOTA_TOKEN === process.env.UPSTASH_REDIS_REST_TOKEN) {
         return res.status(503).json({error:"Restricted quota credential required"});
     }
     try {
@@ -42,7 +41,10 @@ export default async function handler(req,res) {
             reserve:createQuota({url:process.env.UPSTASH_REDIS_REST_URL,token:process.env.DOMAIN_GUARD_QUOTA_TOKEN}),
             lookupApproved,
             workerFiles,
-            createSandbox:options=>Sandbox.create(options)
+            createSandbox:async options=>{
+                const {Sandbox}=await import("@vercel/sandbox");
+                return Sandbox.create(options);
+            }
         });
         return res.status(200).json(result);
     } catch(error) {

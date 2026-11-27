@@ -4,7 +4,7 @@
 
 ### The project
 
-**[Try DomainGuard online](https://domainguard-check.vercel.app/)** (live DNS and email configuration checks).
+**[Try DomainGuard online](https://domainguard-check.vercel.app/)** (live DNS and email configuration checks in production).
 
 I started DomainGuard as a Python command-line tool to make it easier to check a domain's configuration. It has since grown into a local web application that helps website owners understand the settings behind their websites and email services without needing to know how DNS or security protocols work.
 
@@ -76,7 +76,7 @@ Open `http://127.0.0.1:8000/` to explore the example report. The [user guide](do
 
 [Privacy notice](domain_guard/static/privacy.html) · [Terms of use](domain_guard/static/terms.html)
 
-DomainGuard provides configuration observations, not a penetration test or security certification. Only assess domains you own or have permission to check. The hosted site supports live DNS and email observations only. Full public HTTPS, TLS and header assessment requires separate infrastructure and security verification.
+DomainGuard provides configuration observations, not a penetration test or security certification. Only assess domains you own or have permission to check. Production supports live DNS and email observations only. A protected preview can attempt a restricted website probe for the project's own domain; general public HTTPS, TLS and header assessment requires further infrastructure and security verification.
 
 ---
 

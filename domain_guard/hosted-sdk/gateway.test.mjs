@@ -5,7 +5,7 @@ import { canonicalDomain, publicIPv4, runPilot } from "./gateway.mjs";
 function fixture(overrides = {}) {
     const events = [];
     const domain = "example.com", address = "8.8.8.8";
-    const data = {domain, addresses: [address], schema_version: 1, scope: "hosted-web-probe", status: "complete", checks: Object.fromEntries(["https","tls","headers","redirects"].map(k => [k,{status:"pass"}]))};
+    const data = {domain, addresses: [address], schema_version: 1, scope: "hosted-web-probe", status: "complete", records: {}, checks: {https:{status:"pass",message:"Verified HTTPS HEAD response received",status_code:200},tls:{status:"pass",message:"TLS certificate and hostname verified",expires:"2027-01-01",days_remaining:35},headers:{status:"info",message:"Header observations",findings:[]},redirects:{status:"info",message:"No redirect observed"}}};
     const sandbox = {writeFiles: async files => {events.push("write"); assert.equal(files.length,4);}, runCommand: async (cmd,args) => {events.push("run"); assert.equal(cmd,"python3"); assert.deepEqual(args,["-m","domain_guard.hosted_probe",domain,address]); return {exitCode:0,stdout:async()=>JSON.stringify(data)};}, stop:async()=>{events.push("stop");}};
     const deps = {authorize:async()=>{events.push("authorize");return true;},reserve:async()=>{events.push("reserve");return true;},lookupApproved:async()=>{events.push("lookup");return address;},createSandbox:async opts=>{events.push("create");assert.deepEqual(opts.networkPolicy.subnets.allow,[address+"/32"]);assert.equal(opts.persistent,false);assert.equal(opts.timeout,30000);assert.deepEqual(opts.ports,[]);return sandbox;},workerFiles:Object.fromEntries(["domain_guard/hosted_probe.py","domain_guard/checks/headers.py","domain_guard/checks/redirects.py","domain_guard/validation.py"].map(p=>[p,Buffer.from("test")])),...overrides};
     return {events,domain,data,deps,sandbox};
@@ -29,6 +29,24 @@ test("authorized and reserved scan uses pinned policy and stops",async()=>{
 test("worker error and malformed results stop the sandbox",async()=>{
     for(const result of [{exitCode:1,stdout:async()=>""},{exitCode:0,stdout:async()=>JSON.stringify({domain:"other.com"})},{exitCode:0,stdout:async()=>"x".repeat(16385)}]){
         const f=fixture();f.sandbox.runCommand=async()=>result;await assert.rejects(runPilot(f.domain,f.deps));assert.equal(f.events.at(-1),"stop");
+    }
+});
+test("untrusted probe fields and inconsistent outcomes are rejected",async()=>{
+    const changes=[
+        data=>{data.extra="ignored?";},
+        data=>{data.records={TXT:{status:"found",values:["unexpected"]}};},
+        data=>{data.checks.https.message="bad\r\nHeader: injected";},
+        data=>{data.checks.https.status_code="200";},
+        data=>{data.checks.tls.days_remaining=-1;},
+        data=>{data.checks.headers.findings=Array(7).fill({name:"X",status:"info",message:"ok"});},
+        data=>{data.checks.redirects.extra="unexpected";},
+        data=>{data.status="incomplete";}
+    ];
+    for(const change of changes) {
+        const f=fixture();const data=structuredClone(f.data);change(data);
+        f.sandbox.runCommand=async()=>({exitCode:0,stdout:async()=>JSON.stringify(data)});
+        await assert.rejects(runPilot(f.domain,f.deps),{status:502});
+        assert.equal(f.events.at(-1),"stop");
     }
 });
 test("cleanup failure cannot be returned as success",async()=>{

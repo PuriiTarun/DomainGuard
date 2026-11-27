@@ -31,7 +31,7 @@ export default async function handler(req,res) {
         return res.status(400).json({error:"Pilot domain only"});
     }
     // Never use the integration's unrestricted shared Redis credential.
-    if(!process.env.DOMAIN_GUARD_QUOTA_TOKEN || process.env.DOMAIN_GUARD_QUOTA_TOKEN === process.env.UPSTASH_REDIS_REST_TOKEN) {
+    if(process.env.DOMAIN_GUARD_QUOTA_ACL_VERIFIED !== "1" || !process.env.DOMAIN_GUARD_QUOTA_TOKEN || process.env.DOMAIN_GUARD_QUOTA_TOKEN === process.env.UPSTASH_REDIS_REST_TOKEN) {
         return res.status(503).json({error:"Restricted quota credential required"});
     }
     try {

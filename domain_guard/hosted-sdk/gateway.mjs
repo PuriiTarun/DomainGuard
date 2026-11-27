@@ -26,6 +26,29 @@ export class GatewayError extends Error {
     constructor(status, message) { super(message); this.status = status; }
 }
 
+const statuses = new Set(["pass","fail","info","warning","unavailable","incomplete"]);
+const checkNames = ["headers","https","redirects","tls"];
+const validText = value => typeof value === "string" && value.length <= 400 && !/[\x00-\x1f\x7f-\x9f]/.test(value);
+
+function validCheck(name, item) {
+    if(!item || Array.isArray(item) || typeof item !== "object" || !statuses.has(item.status) || !validText(item.message)) return false;
+    const allowed = name === "headers" ? ["status","message","findings"] : name === "https" ? ["status","message","status_code"] : name === "tls" ? ["status","message","expires","days_remaining"] : ["status","message"];
+    if(Object.keys(item).some(key => !allowed.includes(key))) return false;
+    if(name === "https" && item.status === "pass" && (!Number.isInteger(item.status_code) || item.status_code < 200 || item.status_code > 599)) return false;
+    if(name === "tls" && item.status === "pass" && (!/^\d{4}-\d{2}-\d{2}$/.test(item.expires) || !Number.isInteger(item.days_remaining) || item.days_remaining < 0 || item.days_remaining > 36600)) return false;
+    if(name === "headers" && item.findings !== undefined && (!Array.isArray(item.findings) || item.findings.length > 6 || !item.findings.every(finding => finding && typeof finding === "object" && !Array.isArray(finding) && Object.keys(finding).sort().join(",") === "message,name,status" && validText(finding.name) && validText(finding.message) && statuses.has(finding.status)))) return false;
+    return true;
+}
+
+function validProbe(data, domain, address) {
+    if(!data || Array.isArray(data) || typeof data !== "object" || Object.keys(data).sort().join(",") !== "addresses,checks,domain,records,schema_version,scope,status") return false;
+    if(data.domain !== domain || data.scope !== "hosted-web-probe" || data.schema_version !== 1 || !["complete","incomplete"].includes(data.status)) return false;
+    if(!Array.isArray(data.addresses) || data.addresses.length !== 1 || data.addresses[0] !== address || !data.records || Array.isArray(data.records) || Object.keys(data.records).length !== 0) return false;
+    if(!data.checks || Array.isArray(data.checks) || Object.keys(data.checks).sort().join(",") !== checkNames.join(",")) return false;
+    if(!checkNames.every(name => validCheck(name,data.checks[name]))) return false;
+    return data.status === (checkNames.some(name => ["unavailable","incomplete"].includes(data.checks[name].status)) ? "incomplete" : "complete");
+}
+
 // No HTTP endpoint or public mode is enabled by this module. Admission and DNS
 // dependencies must be trusted server-side implementations, never request fields.
 export async function runPilot(domain, dependencies) {
@@ -46,8 +69,7 @@ export async function runPilot(domain, dependencies) {
         const output = await command.stdout();
         if(typeof output !== "string" || Buffer.byteLength(output) > 16384) throw new GatewayError(502, "Invalid probe response");
         const data = JSON.parse(output);
-        if(data.domain !== domain || data.scope !== "hosted-web-probe" || data.schema_version !== 1 || !["complete","incomplete"].includes(data.status) || !Array.isArray(data.addresses) || data.addresses.length !== 1 || data.addresses[0] !== address || !data.checks || Object.keys(data.checks).sort().join(",") !== "headers,https,redirects,tls") throw new GatewayError(502, "Invalid probe response");
-        for(const item of Object.values(data.checks)) if(!item || !["pass","fail","info","warning","unavailable","incomplete"].includes(item.status)) throw new GatewayError(502, "Invalid check status");
+        if(!validProbe(data,domain,address)) throw new GatewayError(502, "Invalid probe response");
         result = data;
     } finally {
         // A failed cleanup is not reported as a successful scan.

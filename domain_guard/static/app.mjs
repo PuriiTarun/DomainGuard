@@ -3,6 +3,7 @@ import { normalizeDomain } from "./input.mjs";
 import { renderReport } from "./render.mjs";
 import { exportReport } from "./report.mjs";
 import { actionDocument, reportFilename } from "./action-plan.mjs";
+import { canRequestHosted, mergeHosted, requestHosted } from "./hosted-report.mjs";
 
 const form = document.getElementById("scan-form");
 const input = document.getElementById("domain");
@@ -36,7 +37,7 @@ async function loadMode() {
             publicDns = (await import("./public-dns.mjs")).scanPublicDns;
             liveEnabled = true;
             mode.textContent = "Live DNS and email checks";
-            document.getElementById("intro").textContent = "Check public DNS and email authentication records, with practical next steps. Website connections, certificates and headers require the local Python scanner.";
+            document.getElementById("intro").textContent = "Check public DNS and email authentication records, with practical next steps. Website connections, certificates and headers require the local Python scanner, except for the fixed owner-domain pilot in a protected preview.";
             document.getElementById("resolver-notice").hidden = false;
             submit.disabled = false;
             buttonState("idle", "Check DNS ↗");
@@ -112,11 +113,23 @@ async function runPublicDns(domain) {
     document.getElementById("results").hidden = true;
     let completed = false;
     try {
-        const report = await publicDns(domain, active.signal);
+        let report = await publicDns(domain, active.signal);
+        if(active.signal.aborted) return;
+        let hosted = false;
+        if(canRequestHosted(domain, location)) {
+            status.textContent = "DNS complete. Checking website settings in the protected preview.";
+            try {
+                report = mergeHosted(report, await requestHosted(domain, active.signal));
+                hosted = true;
+            } catch(cause) {
+                if(cause?.name === "AbortError") throw cause;
+                if(active.signal.aborted) return;
+            }
+        }
         if(active.signal.aborted) return;
         showReport(report, false);
         completed = true;
-        status.textContent = "DNS report ready. Website connection checks were not performed.";
+        status.textContent = hosted ? "DNS and website observations ready." : "DNS report ready. Website connection checks were not performed.";
         buttonState("done", "✓ Check again");
     } catch(error) {
         if(error.name !== "AbortError") status.textContent = "The DNS check could not be completed. Try again later.";
