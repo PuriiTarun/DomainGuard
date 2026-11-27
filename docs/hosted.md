@@ -1,20 +1,36 @@
-# Hosted DNS mode
+# Hosted scanning modes
 
-The production website performs real public DNS and email configuration checks from the visitor's browser. It does not connect to the submitted website. The full scanner remains local-only. A separately gated, protected preview has code for a bounded website probe of domainguard-check.vercel.app only. The pilot route remains disabled by default.
+Production always supports browser-side DNS and email observations. A separate, disabled-by-default server feature may add one bounded HTTPS HEAD response and TLS/header observations, retaining DNS results if unavailable. The full local scanner provides more coverage.
 
-## Scope
+## What the hosted website probe does
 
-- A, AAAA, MX, NS, TXT, CAA and SOA queries.
-- SPF, DMARC, MTA-STS and SMTP TLS reporting record observations.
-- Up to ten requests to Google Public DNS per assessment, two at a time. Per-request and overall deadlines, bounded response sizes, no redirects, no automatic retries, and a client-side cooldown.
-- Website connection, certificate, header and redirect checks are skipped in production. In a protected preview, the gated probe is attempted only for domainguard-check.vercel.app after explicit submission. Other domains receive DNS-only results. A denied or unavailable probe leaves the DNS report and its skipped website states intact. Reports and exports identify each source and scope.
+- The browser explicitly submits a validated ASCII hostname; no URLs, IP literals, or special-use suffixes are accepted.
+- DNS and email lookups go directly to Google Public DNS from the visitor's browser.
+- For admitted website checks, the Vercel function re-validates the hostname, resolves both A and AAAA records through the fixed public resolver, refuses all responses containing a non-public or malformed address, and selects one public IPv4.
+- The function atomically reserves one scan using a restricted Upstash Redis credential. A single counter limits the entire hosted service to **10 scans per UTC day, 100 per UTC month, and one admission per 35 seconds**, including failed scans. This is a global limit, not a per-user allowance; users may encounter exhausted capacity.
+- A short-lived Vercel Sandbox receives only four pinned Python worker modules and a deny-by-default network policy allowing one screened IPv4 /32. The worker verifies TLS for the supplied hostname and sends a single HTTPS HEAD / request. It does not follow redirects, fetch response bodies, or send authentication credentials.
+- CPU, runtime, HTTP request/response and report sizes are bounded; the Sandbox is stopped in the success and worker-error paths. The returned report has a strict schema.
+- If admission, DNS, provider capacity, or the worker fails, the public DNS-only report remains usable. The website scan is not a certification or security audit.
 
-The visitor's browser sends domain names to Google's fixed DNS-over-HTTPS endpoint only after submission. Requests omit credentials and referrers and request no EDNS client subnet disclosure. The provider can see the visitor's network address and queried names. Do not submit private or unauthorized names. See the privacy notice for details. Client-side limits govern the application, not a global or adversary-proof provider rate limit.
+## Deployment gates
 
-## Deployment and acceptance
+**Production:** `VERCEL_ENV=production` and `DOMAIN_GUARD_PUBLIC=1` are both required. The production host must be `domainguard-check.vercel.app`, with matching Host and Origin and same-origin Fetch Metadata. Browser-controlled headers are request-shape checks, not authentication. Production access is public; server-enforced quota plus Sandbox isolation bound admitted work. A dedicated restricted `DOMAIN_GUARD_QUOTA_TOKEN` and `DOMAIN_GUARD_QUOTA_ACL_VERIFIED=1` are required in Production. The scanner never uses the unrestricted shared Upstash token. This public mode must not be activated until its production credential and monitoring are ready.
 
-The repository contains root and `domain_guard/static` Vercel packaging. The root JavaScript route and controller re-export the static-root implementation, while `scripts/check-hosted-packaging.mjs` verifies the Python worker mirrors and browser asset manifests. Production always disables the route, including if activation flags are present. The pilot requires Vercel Preview Authentication as the caller-access boundary, `VERCEL_ENV=preview`, `DOMAIN_GUARD_PILOT=1`, `DOMAIN_GUARD_PILOT_ALLOWLIST=domainguard-check.vercel.app`, `DOMAIN_GUARD_QUOTA_ACL_VERIFIED=1`, and a restricted `DOMAIN_GUARD_QUOTA_TOKEN`. The exact allowlist value is a server-side configuration gate, not a browser secret. Origin, Fetch Metadata and Host checks reject unexpected routing; they do not authenticate callers. The restricted token is the only quota credential supplied to the adapter.
+**Protected Preview:** `VERCEL_ENV=preview`, `DOMAIN_GUARD_PILOT=1` and `DOMAIN_GUARD_PILOT_ALLOWLIST=domainguard-check.vercel.app` are required. Vercel Preview Authentication is the caller boundary; the same quota credential and ACL verification gates apply. Only the pilot hostname is accepted. Use a branch-restricted Preview Secret for the restricted token.
 
-The restricted Upstash ACL, live concurrency, and Sandbox network/worker checks were reported as passed before this hardening change; their credentials and live evidence are not stored in this repository. Keep the existing Secret scoped to Preview and this development branch. Preserve the initialized counter, default Redis integration, and all job-radar keys. The read-only `node scripts/verify-quota-acl.mjs` checks direct and Lua denial on an unrelated key; the opt-in `node scripts/verify-quota-live.mjs` consumes one reservation. Do not repeat live cloud tests without an explicit review plan.
+The credential may access only `domainguard:scan-quota:v1` and Redis `TIME`, `GET`, `SET` and `EVAL` as verified by the ACL test. Preserve all other Redis keys and the existing integrations. Production and Preview use the same counter only if supplied with credentials for the same restricted quota user.
 
-Before promotion, inspect the hosted CSP and test successful DNS queries for an authorized domain, resolver failures, report exports, sample data labeling, skipped website checks, cancellation and desktop/mobile rendering. Run the offline JavaScript tests with `node --test tests/test_*.mjs`. Verify the protected pilot separately; a mocked browser test does not prove a real sandbox scan. No hosted full scanner should be enabled until independently enforced network isolation, bounded admission and abuse controls, privacy disclosures, costs and deployment security are verified.
+## Release and rollback
+
+1. Run Python tests, JavaScript tests, packaging parity, Bandit, dependency audits, Gitleaks, and `git diff --check`.
+2. Confirm Production has the restricted quota secret and ACL verification flag without modifying the unrestricted job-radar integration. Keep `DOMAIN_GUARD_PUBLIC` absent for the first Production staging deployment.
+3. Deploy a staged production build **without assigning the production hostname**, validate the disabled endpoint and authentication/routing, then activate `DOMAIN_GUARD_PUBLIC=1` in a new staged production build and test the exact deployment before promoting it. Environment variable updates do not retroactively change old deployment snapshots.
+4. Verify an authorized public-domain scan, an unauthorized/special-use hostname rejection, a quota-exhaustion response, DNS-only fallback, browser report/export and successful Sandbox cleanup; inspect function runtime errors and quotas.
+5. Promote only the accepted staged Production deployment. Monitor errors, resource usage and quota. If compromised or abused, remove the activation flag, deploy an updated disabled Production build, and restore/rollback production traffic. Retire older enabled deployment URLs as needed. Do not rely on deleting an environment variable to disable already-built deployments.
+6. Keep Preview protected. Do not promote a Preview deployment directly as evidence for the Production build.
+
+## Privacy and permissions
+
+Only assess domains you own, administer or have permission to check. The external destination sees a limited HTTPS HEAD request from the Vercel Sandbox, the hostname via SNI and HTTP Host, and the scan's timing and user agent. Google Public DNS sees browser queries. Vercel and Upstash process scanner requests and aggregate quota counts. DomainGuard does not request passwords or intentionally persist per-domain scan history, but platform infrastructure may retain access metadata. Read the published Privacy notice and Terms.
+
+The existing production DNS-only experience remains available even when the hosted website feature is disabled or the shared quota is exhausted.
