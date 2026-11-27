@@ -15,6 +15,8 @@ let lastReport = null;
 let selectedFilter = "all";
 let liveEnabled = false;
 let activeJob = null;
+let publicDns = null;
+let nextDnsCheck = 0;
 const cancel = document.getElementById("cancel-scan");
 const demo = document.getElementById("demo-button");
 
@@ -29,6 +31,18 @@ async function readJson(response) {
 }
 
 async function loadMode() {
+    if(location.protocol === "https:") {
+        try {
+            publicDns = (await import("./public-dns.mjs")).scanPublicDns;
+            liveEnabled = true;
+            mode.textContent = "Live DNS and email checks";
+            document.getElementById("intro").textContent = "Check public DNS and email authentication records, with practical next steps. Website connections, certificates and headers require the local Python scanner.";
+            document.getElementById("resolver-notice").hidden = false;
+            submit.disabled = false;
+            buttonState("idle", "Check DNS ↗");
+            return;
+        } catch { /* Fail closed if the hosted module is unavailable. */ }
+    }
     try {
         if(location.protocol !== "http:" || location.hostname !== "127.0.0.1") throw new Error("Static mode");
         const response = await fetch("/api/capabilities", {cache: "no-store", signal: AbortSignal.timeout(5000)});
@@ -87,12 +101,38 @@ async function cancelScan() {
     }
 }
 
+async function runPublicDns(domain) {
+    if(Date.now() < nextDnsCheck) { status.textContent = "Wait a few seconds before checking again."; return; }
+    active = new AbortController();
+    nextDnsCheck = Date.now() + 5000;
+    cancel.hidden = false;
+    submit.disabled = true; demo.disabled = true; input.readOnly = true;
+    buttonState("busy", "Checking DNS");
+    status.textContent = "Checking public DNS and email records.";
+    document.getElementById("results").hidden = true;
+    let completed = false;
+    try {
+        const report = await publicDns(domain, active.signal);
+        if(active.signal.aborted) return;
+        showReport(report, false);
+        completed = true;
+        status.textContent = "DNS report ready. Website connection checks were not performed.";
+        buttonState("done", "✓ Check again");
+    } catch(error) {
+        if(error.name !== "AbortError") status.textContent = "The DNS check could not be completed. Try again later.";
+    } finally {
+        active = null; cancel.hidden = true; submit.disabled = false; demo.disabled = false; input.readOnly = false;
+        if(!completed) buttonState("idle", "Check DNS ↗");
+    }
+}
+
 async function runScan(event) {
     event.preventDefault();
     if(!liveEnabled || active) return;
     error.textContent = "";
     const domain = normalizeDomain(input.value);
     if(!domain) { error.textContent = "Enter a domain name such as example.com. URLs and IP addresses are not accepted."; input.focus(); return; }
+    if(publicDns) { await runPublicDns(domain); return; }
     active = new AbortController();
     const timer = setTimeout(() => { void cancelScan(); status.textContent = "Scan timed out."; }, 135000);
     cancel.hidden = false;
@@ -143,7 +183,7 @@ document.getElementById("filter-review").addEventListener("click", () => setFilt
 form.addEventListener("submit", runScan);
 cancel.addEventListener("click", () => { void cancelScan(); status.textContent = "Scan cancellation requested."; });
 demo.addEventListener("click", () => { if(active) return; showReport(demoReport, true); status.textContent = "Showing sample data. No live check was run."; });
-input.addEventListener("input", () => { if(!active) buttonState("idle", "Check domain ↗"); });
+input.addEventListener("input", () => { if(!active) buttonState("idle", publicDns ? "Check DNS ↗" : "Check domain ↗"); });
 document.getElementById("print-report").addEventListener("click", () => {
     if(!lastReport) return;
     const previous = selectedFilter;

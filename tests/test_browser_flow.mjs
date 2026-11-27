@@ -35,10 +35,10 @@ test("special-use names and oversized input are rejected in the frontend", () =>
     for(const name of ["home.arpa", "host.localdomain", "host.alt", "host.corp", "host.intranet", "host.private", " ".repeat(512) + "example.com"]) assert.equal(normalizeDomain(name), null);
 });
 
-test("public static demonstration never calls an API", async () => {
+test("non-loopback HTTP demonstration never calls an API", async () => {
     const get = fixture();
     const originalFetch = globalThis.fetch;
-    globalThis.location = {protocol: "https:", hostname: "demo.example.com"};
+    globalThis.location = {protocol: "http:", hostname: "demo.example.com"};
     let requests = 0;
     globalThis.fetch = () => { requests++; throw new Error("Unexpected request"); };
     try {
@@ -99,4 +99,33 @@ test("website uses one dark theme and local Geist typography", () => {
     assert.match(css, /--paper:#111111/);
     assert.match(css, /--signal:#C9EF35/);
     assert.match(css, /--pink:#ff2e93/);
+});
+
+test("hosted browser DNS mode submits to resolver only on explicit action", async () => {
+    const get = fixture();
+    const originalFetch = globalThis.fetch;
+    globalThis.location = {protocol: "https:", hostname: "demo.example.com"};
+    const requests = [];
+    globalThis.fetch = async (url, options) => {
+        requests.push({url, options});
+        const target = new URL(url);
+        assert.equal(target.origin, "https://dns.google");
+        return new Response(JSON.stringify({Status: 0, TC: false, Question: [{name: target.searchParams.get("name") + ".", type: Number(target.searchParams.get("type"))}]}));
+    };
+    try {
+        const {ready} = await import("../domain_guard/static/app.mjs?hosted-dns-test");
+        await ready;
+        assert.equal(get("scan-button").disabled, false);
+        assert.equal(get("resolver-notice").hidden, false);
+        assert.equal(requests.length, 0);
+        get("domain").value = "example.com";
+        await get("scan-form").handlers.submit({preventDefault() {}});
+        assert.equal(requests.length, 10);
+        assert.equal(get("result-kind").textContent, "Live DNS and email observations");
+        assert.match(get("result-subtitle").textContent, /were not assessed/);
+        assert.equal(get("scan-button").disabled, false);
+        assert.equal(get("domain").readOnly, false);
+        await get("scan-form").handlers.submit({preventDefault() {}});
+        assert.equal(requests.length, 10);
+    } finally { globalThis.fetch = originalFetch; restore(); }
 });

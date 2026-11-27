@@ -36,7 +36,7 @@ function escape(value) {
 export function actionDocument(report, synthetic = false) {
     const domain = typeof report?.domain === "string" ? normalizeDomain(report.domain) : null;
     const title = escape(domain || "Unknown domain");
-    const source = synthetic ? "Example report, not a live scan" : "Local scan";
+    const source = synthetic ? "Example report, not a live scan" : report?.scope === "dns-email" ? "Live public DNS observations only; HTTPS, TLS and headers not assessed" : "Local scan";
     const actions = recommendations(report);
     const items = actions.map((action, index) => {
         const steps = actionSteps(action);

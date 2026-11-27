@@ -4,7 +4,7 @@ DomainGuard checks public domain configuration. It does not test application vul
 
 ## Supported operation
 
-Use the local scanner only for authorized domains. The server binds to loopback and must not be exposed through a proxy, tunnel or public interface. The static demonstration performs no live scans. Public live scanning is not supported by this version.
+Use the local scanner only for authorized domains. The server binds to loopback and must not be exposed through a proxy, tunnel or public interface. The hosted DNS mode performs public DNS queries directly from the visitor's browser through a fixed external resolver; it does not contact the submitted website or expose a scanning backend. Full public live scanning is not supported by this version.
 
 ## Reporting a vulnerability
 
