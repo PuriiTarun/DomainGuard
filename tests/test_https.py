@@ -1,3 +1,4 @@
+import ssl
 from unittest.mock import patch
 import pytest
 import urllib3
@@ -16,7 +17,10 @@ def test_https_success(status_code):
         # Verify the connection uses the approved IP and original hostname
         assert mock_pool.call_args.args[0] == "8.8.8.8"
         assert mock_pool.call_args.kwargs["server_hostname"] == "example.com"
-        assert mock_pool.call_args.kwargs["assert_hostname"] == "example.com"
+        context = mock_pool.call_args.kwargs["ssl_context"]
+        assert context.check_hostname
+        assert context.verify_mode == ssl.CERT_REQUIRED
+        assert not context.hostname_checks_common_name
         options = mock_pool.return_value.urlopen.call_args.kwargs
         assert options["headers"]["Host"] == "example.com"
         assert options["redirect"] is False
@@ -36,7 +40,7 @@ def test_ssl_error():
     # Simulate a TLS certificate verification failure
     with patch("domain_guard.checks.https.urllib3.HTTPSConnectionPool") as mock_pool:
         mock_pool.return_value.urlopen.side_effect = urllib3.exceptions.SSLError(
-            "Certificate verification failed"
+            ssl.SSLCertVerificationError("Certificate verification failed")
         )
         result = check_https("example.com", ["8.8.8.8"])
         assert result["success"] is False
@@ -64,3 +68,30 @@ def test_connection_error():
         assert result["success"] is False
         assert result["status_code"] is None
         assert result["message"] == "Could not connect to the website"
+
+@pytest.mark.parametrize("domain", ["localhost", "example.com\r\nHost: localhost", None])
+def test_invalid_host_never_connects(domain):
+    with patch("domain_guard.checks.https.urllib3.HTTPSConnectionPool") as mock_pool:
+        result = check_https(domain, ["8.8.8.8"])
+    assert result["success"] is False
+    assert result["message"] == "Invalid domain"
+    mock_pool.assert_not_called()
+
+def test_deadline_exceeded_never_connects():
+    with patch("domain_guard.checks.https.urllib3.HTTPSConnectionPool") as pool:
+        result = check_https("example.com", ["8.8.8.8"], timeout=0)
+    assert result["success"] is False
+    pool.assert_not_called()
+
+def test_response_and_pool_are_closed():
+    with patch("domain_guard.checks.https.urllib3.HTTPSConnectionPool") as pool:
+        check_https("example.com", ["8.8.8.8"])
+    pool.return_value.urlopen.return_value.close.assert_called_once()
+    pool.return_value.urlopen.return_value.release_conn.assert_called_once()
+    pool.return_value.close.assert_called_once()
+
+def test_ssl_protocol_error_does_not_claim_certificate_failure():
+    with patch("domain_guard.checks.https.urllib3.HTTPSConnectionPool") as pool:
+        pool.return_value.urlopen.side_effect = urllib3.exceptions.SSLError(ssl.SSLError("Protocol failure"))
+        result = check_https("example.com", ["8.8.8.8"])
+    assert not result["success"] and result["message"] == "TLS handshake failed"

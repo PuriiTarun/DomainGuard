@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#111111">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'self'; img-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'">
+    <meta name="description" content="Check DNS records, TLS certificates, HTTP security headers and email authentication. Get an understandable report and practical next steps with DomainGuard.">
+    <title>DomainGuard | Domain Security Checker for DNS, HTTPS and Email</title>
+    <link rel="stylesheet" href="./styles.css">
+    <meta property="og:title" content="DomainGuard | Domain Security Checker">
+    <meta property="og:description" content="Understand your DNS, HTTPS and email settings. See what needs attention and get a practical action plan.">
+</head>
+<body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header" id="top">
+        <div class="shell header-inner">
+            <a class="brand" href="./index.html" aria-label="DomainGuard home">Domain<span class="brand-accent">Guard</span><span class="brand-period" aria-hidden="true">.</span></a>
+            <nav aria-label="Main navigation"><a class="nav-current" href="#scan-form">Domain checker</a><a href="#checks">Checks</a><a href="#methodology">Methodology</a></nav>
+            <a class="nav-cta" href="#scan-form">Check a domain <span aria-hidden="true">↗</span></a>
+        </div>
+    </header>
+    <main id="main">
+        <section class="hero" aria-labelledby="hero-title">
+            <div class="shell hero-grid">
+                <div class="hero-content">
+                    <h1 id="hero-title">Check your domain.<br><em>Find what to fix.</em></h1>
+                    <p class="intro">Check your website security settings, DNS records and email authentication in one report. Understand what is working, what needs attention and how to improve it.</p>
+                    <form id="scan-form" class="scan-form" novalidate>
+                        <label for="domain">Your domain name</label>
+                        <div class="input-row"><div class="input-wrap"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c5 5 5 13 0 18-5-5-5-13 0-18Z"/></svg><input id="domain" name="domain" type="text" inputmode="url" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="253" placeholder="example.com" aria-describedby="domain-help domain-error" required></div><button id="scan-button" type="submit" disabled>Check domain <span aria-hidden="true">↗</span></button><button id="cancel-scan" class="secondary-button" type="button" hidden>Cancel</button></div>
+                        <p class="field-help" id="domain-help">Enter a domain such as example.com, without https://. Only check domains you own or have permission to assess.</p>
+                        <p class="field-error" id="domain-error" role="alert"></p>
+                    </form>
+                    <div class="hero-bottom"><button id="demo-button" class="text-button" type="button">Explore an example report <span aria-hidden="true">→</span></button><span class="mode-label" id="mode-label">Checking availability</span></div>
+                    <p id="scan-status" role="status" aria-live="polite" aria-atomic="true"></p>
+                    <p class="scan-consent">By starting a check, you agree to the <a href="./terms.html">Terms of use</a>. Read our <a href="./privacy.html">Privacy notice</a>.</p>
+                </div>
+                <aside class="preview-panel" aria-label="Sample report preview">
+                    <div class="preview-top"><span class="preview-label">REPORT PREVIEW</span><span class="preview-sample">Example data</span></div>
+                    <div class="preview-domain"><span class="preview-icon" aria-hidden="true">◎</span><div><strong>example.com</strong><p>Domain configuration</p></div><span class="preview-complete">3 areas</span></div>
+                    <div class="preview-check"><span class="preview-symbol" aria-hidden="true">01</span><div><strong>DNS records</strong><p>Where your website and email point</p></div><span class="preview-state">Found</span></div>
+                    <div class="preview-check"><span class="preview-symbol" aria-hidden="true">02</span><div><strong>Website connection</strong><p>Certificate and browser settings</p></div><span class="preview-state">Verified</span></div>
+                    <div class="preview-check"><span class="preview-symbol" aria-hidden="true">03</span><div><strong>Email authentication</strong><p>Published sender policies</p></div><span class="preview-state review">Review</span></div>
+                    <div class="preview-next"><span aria-hidden="true">↳</span><div><strong>Know your next step.</strong><p>Get practical recommendations you can share with your provider.</p></div></div>
+                </aside>
+            </div>
+        </section>
+        <section id="results" class="shell results" aria-labelledby="results-title" hidden>
+            <div class="report-heading"><div><p id="result-kind" class="sr-only"></p><h2 id="results-title" tabindex="-1">Assessment results</h2><p id="result-subtitle"></p></div><div class="result-actions"><button id="download-json" class="secondary-button" type="button">↓ Download JSON</button><button id="copy-json" class="secondary-button" type="button">Copy JSON</button><button id="print-report" class="secondary-button" type="button">Print</button></div></div>
+            <div class="summary-grid" id="summary-grid"></div>
+            <div class="report-brief"><p id="report-brief-text"></p><a href="#improvements">Go to your action plan <span aria-hidden="true">→</span></a></div>
+            <p class="report-limit">These are observations, not a security certification. Some settings are optional; an unavailable check does not establish whether something is safe or unsafe.</p>
+            <div class="report-layout">
+                <aside class="report-sidebar"><p class="eyebrow">YOUR REPORT</p><nav class="report-nav" aria-label="Report sections"><a href="#findings">01 / Check results</a><a href="#improvements">02 / What to do next</a></nav><p>Share the recommendations with the people who manage your website or email.</p></aside>
+                <div class="report-body"><div class="findings-heading"><div><p class="eyebrow">01 / OBSERVATIONS</p><h3 id="findings" class="section-title">What we found</h3></div><div class="filter" role="group" aria-label="Filter findings"><button id="filter-all" type="button" aria-pressed="true">All checks</button><button id="filter-review" type="button" aria-pressed="false">Needs review</button></div></div><p class="section-description">Each check explains what the setting does. Expand the evidence to see the values returned by the scan.</p><p id="filter-status" role="status" class="filter-status"></p><div class="result-groups" id="result-groups"></div>
+                <section id="improvements" class="improvements" aria-labelledby="improvements-title"><p class="eyebrow">02 / ACTION PLAN</p><h3 id="improvements-title" class="section-title">What to do next</h3><p class="section-description">Start with the checks that need attention. Ask the right provider to help and test changes before applying them.</p><div id="recommendations"></div><div class="action-footer"><p>Send this plan to your website or email provider.</p><button id="download-plan" class="secondary-button" type="button">↓ Download action plan</button></div></section></div>
+            </div>
+        </section>
+        <section id="checks" class="shell info-section" aria-labelledby="checks-title">
+            <div class="section-lead"><p class="eyebrow">THE BASICS</p><h2 id="checks-title">What does DomainGuard check?</h2><p>DNS, website security and email authentication.</p></div>
+            <div class="scope-list"><article><span class="scope-number">01 / DNS</span><h3>Where things go.</h3><p>DNS is the address book for your domain. We look at where your website and email point, and the other records your providers publish.</p><a href="#methodology">Read the methodology <span aria-hidden="true">↗</span></a></article><article><span class="scope-number">02 / HTTPS</span><h3>How visitors connect.</h3><p>HTTPS encrypts the connection to your site. We inspect its certificate and visible browser security settings.</p><a href="#methodology">Read the methodology <span aria-hidden="true">↗</span></a></article><article><span class="scope-number">03 / EMAIL</span><h3>Who can send as you.</h3><p>Email authentication policies help receiving servers identify messages sent using your domain. We look at the records, not actual message delivery.</p><a href="#methodology">Read the methodology <span aria-hidden="true">↗</span></a></article></div>
+        </section>
+        <section class="shell help-section" aria-labelledby="help-title"><div><p class="eyebrow">HELP & METHODOLOGY</p><h2 id="help-title">How to read your report</h2></div><div class="help-items"><details id="methodology"><summary>How the checks work</summary><p>DomainGuard screens resolved addresses before connecting to public HTTPS endpoints. Certificates are verified against the requested hostname. Redirects are not followed. A single response cannot establish the security of every page. Email records are observations, not full standards-compliance checks.</p></details><details><summary>What if something is missing?</summary><p>Not every domain needs every record or security header. A missing record may be intentional. Follow the recommendations that apply to your setup and ask your provider before changing DNS or security policies.</p></details><details><summary>Is a completed report proof that my website is secure?</summary><p>No. DomainGuard checks a limited set of publicly visible settings. It does not test your application code, passwords, databases or all possible attacks. For a full assessment, consult a qualified security professional.</p></details></div></section>
+    </main>
+    <footer class="site-footer"><div class="shell footer-inner">
+        <div class="footer-main"><a class="brand" href="#top">Domain<span class="brand-accent">Guard</span><span class="brand-period" aria-hidden="true">.</span></a><p>Understand your domain configuration before making changes.</p><p class="footer-credit">Developed by <a href="https://github.com/PuriiTarun" rel="noopener noreferrer">Tarun Puri</a></p></div>
+        <div class="footer-links"><strong>Explore</strong><a href="#scan-form">Domain checker</a><a href="#checks">Supported checks</a><a href="#methodology">Methodology</a></div>
+        <div class="footer-links"><strong>Project</strong><a href="https://github.com/PuriiTarun/DomainGuard" rel="noopener noreferrer">GitHub repository ↗</a><a href="./privacy.html">Privacy notice</a><a href="./terms.html">Terms of use</a></div>
+        <div class="footer-bottom"><span>Configuration observations only. Not a penetration test.</span><a href="#top">Back to top ↑</a></div>
+    </div></footer>
+    <script type="module" src="./app.mjs"></script>
+</body>
+</html>

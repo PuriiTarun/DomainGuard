@@ -1,9 +1,10 @@
-import ipaddress
 import socket
 import ssl
 from datetime import datetime, timezone
+from domain_guard.network import validate_addresses
+from domain_guard.validation import is_valid_domain
 
-def check_tls(domain, addresses):
+def check_tls(domain, addresses, timeout=5, now=None):
     """
     Check a website's TLS certificate and expiration date.
     Connect to a screened public IP and verify the original hostname.
@@ -15,24 +16,27 @@ def check_tls(domain, addresses):
         "message": ""
     }
 
+    if(not is_valid_domain(domain)):
+        result["message"] = "Invalid domain"
+        return result
+    if(timeout <= 0):
+        result["message"] = "Scan deadline exceeded"
+        return result
+
     # Only allow connections to public IP addresses
     if(not addresses):
         result["message"] = "No IP addresses available"
         return result
 
-    for address in addresses:
-        try:
-            if(not ipaddress.ip_address(address).is_global):
-                result["message"] = "Non-public IP address detected"
-                return result
-        except ValueError:
-            result["message"] = "Invalid IP address"
-            return result
+    if(not validate_addresses(addresses)):
+        result["message"] = "Invalid or non-public IP address"
+        return result
     try:
         context = ssl.create_default_context()
+        context.hostname_checks_common_name = False
 
         # Connect to an approved IP without resolving the hostname again
-        with socket.create_connection((addresses[0], 443), timeout=5) as connection:
+        with socket.create_connection((addresses[0], 443), timeout=min(timeout, 5)) as connection:
             with context.wrap_socket(connection, server_hostname=domain) as tls_socket:
                 certificate = tls_socket.getpeercert()
 
@@ -43,14 +47,25 @@ def check_tls(domain, addresses):
                 expiration = certificate["notAfter"]
                 timestamp = ssl.cert_time_to_seconds(expiration)
                 expiry_date = datetime.fromtimestamp(timestamp, timezone.utc)
-                current_date = datetime.now(timezone.utc)
+                current_date = now if now is not None else datetime.now(timezone.utc)
+                if("notBefore" in certificate):
+                    start = datetime.fromtimestamp(ssl.cert_time_to_seconds(certificate["notBefore"]), timezone.utc)
+                    if(start > current_date):
+                        result["message"] = "TLS certificate not yet valid"
+                        return result
+                if(expiry_date <= current_date):
+                    result["message"] = "TLS certificate expired"
+                    return result
                 result["valid"] = True
                 result["expires"] = expiry_date.strftime("%Y-%m-%d")
                 result["days_remaining"] = (expiry_date - current_date).days
                 result["message"] = "TLS certificate verified"
 
-    except ssl.SSLError:
+    except ssl.SSLCertVerificationError:
         result["message"] = "TLS certificate verification failed"
+
+    except ssl.SSLError:
+        result["message"] = "TLS handshake failed"
 
     except TimeoutError:
         result["message"] = "TLS connection timed out"

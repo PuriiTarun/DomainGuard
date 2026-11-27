@@ -1,96 +1,85 @@
 import argparse
-from domain_guard.checks.https import check_https
-from domain_guard.validation import is_valid_domain
-from domain_guard.network import check_public_dns
-from domain_guard.checks.tls import check_tls
-from domain_guard.checks.dns import check_dns
+import json
+import threading
+from domain_guard.worker import run_scan
+from domain_guard.runtime import RuntimeNotReady, require_runtime
+from domain_guard.validation import normalize_domain
+
+def safe_text(value):
+    return "".join(char if char.isprintable() and char not in "\x1b\x7f" else "?" for char in str(value))
+
+def show_check(name, check):
+    print(f"{name}: {safe_text(check['status']).upper()}")
+    print(f"Details: {safe_text(check['message'])}")
+    if(check.get("status_code") is not None):
+        print(f"Status Code: {check['status_code']}")
+    if(check.get("expires") is not None):
+        print(f"Expires: {safe_text(check['expires'])}")
+        print(f"Days Remaining: {check['days_remaining']}")
+        if(check["days_remaining"] < 30):
+            print("Warning: Certificate expires within 30 days")
+    for finding in check.get("findings", []):
+        print(f"  {safe_text(finding['name'])}: {safe_text(finding['message'])}")
+
+def show_records(result):
+    labels = {"found": "Found", "missing": "Not found", "multiple": "Multiple records detected",
+              "error": "DNS lookup failed", "nxdomain": "Name does not exist", "incomplete": "Incomplete"}
+    print("\n--- DNS Records ---")
+    for kind, lookup in result["records"].items():
+        print(f"{safe_text(kind)}: {labels.get(lookup['status'], 'Unavailable')}")
+        if(lookup.get("message")):
+            print(f"  {safe_text(lookup['message'])}")
+        if(kind == "TXT"):
+            print(f"  {len(lookup['values'])} record(s)")
+        else:
+            for value in lookup["values"]:
+                print(f"  {safe_text(value)}")
+    print("\n--- Email Authentication ---")
+    for kind, name in (("spf", "SPF"), ("dmarc", "DMARC"), ("mta_sts", "MTA-STS"), ("tlsrpt", "SMTP TLS reporting")):
+        if(kind not in result):
+            continue
+        lookup = result[kind]
+        label = "Detected (not validated)" if lookup["status"] == "found" else labels.get(lookup["status"], "Unavailable")
+        print(f"{name}: {label}")
+        if(lookup.get("message")):
+            print(f"  {safe_text(lookup['message'])}")
+        for value in lookup["values"]:
+            print(f"  {safe_text(value)}")
+        for finding in lookup.get("findings", []):
+            print(f"  {safe_text(finding['name'])}: {safe_text(finding['message'])}")
 
 def main():
-    """Accept a domain and display its HTTPS connection status."""
-
-    parser = argparse.ArgumentParser(
-        description="DomainGuard: Website Security Diagnostic Tool"
-    )
-
-    parser.add_argument(
-        "domain",
-        help="Website domain to check (example.com)"
-    )
-
+    parser = argparse.ArgumentParser(description="DomainGuard: domain configuration assessment")
+    parser.add_argument("domain", help="Website domain to check (example.com)")
+    parser.add_argument("--json", action="store_true", help="Write the structured report as JSON")
     args = parser.parse_args()
-    domain = args.domain.strip().lower()
-
-    if(not is_valid_domain(domain)):
+    try:
+        domain = normalize_domain(args.domain)
+    except ValueError:
         parser.error("Invalid domain. Enter a domain such as example.com")
-
-    # Check the resolved IP addresses before making an HTTPS request
-    network_result = check_public_dns(domain)
-
-    if(not network_result["safe"]):
-        parser.error(network_result["message"])
-
+    try:
+        require_runtime()
+        result = run_scan(domain, threading.Event())
+    except RuntimeNotReady as error:
+        parser.exit(1, f"{error}\n")
+    except TimeoutError:
+        parser.exit(1, "Scan deadline exceeded; no complete result available.\n")
+    except (OSError, ValueError):
+        parser.exit(1, "Scan could not be completed.\n")
+    if(args.json):
+        print(json.dumps(result, ensure_ascii=True, allow_nan=False))
+        if(result["status"] != "complete"):
+            raise SystemExit(2 if result["status"] == "rejected" else 1)
+        return
+    if(not result["addresses"]):
+        parser.error(safe_text(result["checks"]["address"]["message"]))
     print("\n=== DomainGuard ===")
     print(f"Target: {domain}")
-    print("-------------------------")
+    for key, name in (("https", "HTTPS"), ("tls", "TLS"), ("headers", "HTTP security headers"), ("redirects", "Redirects"), ("output", "Output budget")):
+        if(key in result["checks"]):
+            show_check(name, result["checks"][key])
+    show_records(result)
+    print(f"\nAssessment: {safe_text(result['status'])}")
 
-    result = check_https(domain, network_result["addresses"])
-
-    if(result["success"]):
-        print("HTTPS: CONNECTED")
-        print(f"Status Code: {result['status_code']}")
-    else:
-        print("HTTPS: FAILED")
-
-    print(f"Details: {result['message']}")
-
-    print("\n--- TLS Certificate ---")
-
-    tls_result = check_tls(domain, network_result["addresses"])
-
-    if tls_result["valid"]:
-        print("TLS: VERIFIED")
-        print(f"Expires: {tls_result['expires']}")
-        print(f"Days Remaining: {tls_result['days_remaining']}")
-
-        if tls_result["days_remaining"] < 30:
-            print("Warning: Certificate expires within 30 days")
-    else:
-        print("TLS: CHECK FAILED")
-
-    print(f"Details: {tls_result['message']}")
-
-    print("\n--- DNS Records ---")
-
-    dns_result = check_dns(domain)
-
-    # Display DNS records returned by each lookup
-    for record_type, lookup in dns_result["records"].items():
-        if(lookup["status"] == "found"):
-            if(record_type == "TXT"):
-                print(f"TXT: {len(lookup['values'])} record(s) found")
-            else:
-                print(f"{record_type}:")
-                for value in lookup["values"]:
-                    print(f"  {value}")
-        elif(lookup["status"] == "missing"):
-            print(f"{record_type}: Not found")
-        else:
-            print(f"{record_type}: Lookup failed")
-
-    print("\n--- Email Authentication ---")
-
-    status_labels = {
-        "found": "Detected (not validated)",
-        "missing": "Not found",
-        "multiple": "Multiple records detected",
-        "error": "DNS lookup failed"
-    }
-
-    for record_type in ("spf", "dmarc"):
-        lookup = dns_result[record_type]
-        print(f"{record_type.upper()}: {status_labels[lookup['status']]}")
-
-        for value in lookup["values"]:
-            print(f"  {value}")
-
-main()
+if(__name__ == "__main__"):
+    main()
