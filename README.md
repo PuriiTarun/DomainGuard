@@ -1,63 +1,99 @@
-# DomainGuard
+<h1 align="center">DomainGuard</h1>
+<p align="center">Understand your domain. Know what needs attention.</p>
+<p align="center"><strong>DNS · HTTPS · TLS · Email security</strong></p>
+<p align="center">
+  <a href="#quick-start">Get started</a> ·
+  <a href="#what-it-checks">Features</a> ·
+  <a href="docs/usage.md">User guide</a> ·
+  <a href="docs/development.md">Development</a>
+</p>
 
-DomainGuard checks public domain configuration using Python. It inspects DNS records, HTTPS connectivity, TLS certificates, HTTP response security headers and published email security records. It provides observations rather than a security score or a complete vulnerability assessment.
+---
 
-## Setup
+### The project
 
-Python 3.12 or newer is required. Create a virtual environment with `python -m venv .venv`. On Windows, activate it with `.venv\Scripts\Activate.ps1`; on Linux or macOS, use `source .venv/bin/activate`. Then run `python -m pip install .`. Alternatively, run the Python executable from that environment directly.
+I started DomainGuard as a Python command-line tool for checking domain configuration. It has since grown into a local web application that helps both technical users and website owners understand their DNS, certificate, website and email settings.
 
-## CLI
+The aim is to explain what was observed, why it matters and what to do next, without treating a missing optional record as a confirmed vulnerability.
+
+### What it checks
+
+| Area | Checks |
+| --- | --- |
+| DNS | A, AAAA, MX, NS, TXT, CAA and SOA records |
+| Website | Verified HTTPS connection, response status and redirect observations |
+| Certificates | TLS hostname verification, expiry date and days remaining |
+| Browser protection | HSTS, CSP, content type, framing, referrer and permissions policies |
+| Email | SPF, DMARC, MTA-STS and SMTP TLS reporting DNS observations |
+
+The web interface includes understandable findings, expandable technical evidence, a findings filter, JSON exports and a printable action plan with recommended changes, responsible providers and retesting instructions.
+
+### How it has progressed
+
+| Original CLI | V2 review release |
+| --- | --- |
+| 56 passing Python tests | 317 passing Python tests on Windows |
+| Command-line reports | CLI and responsive web interface |
+| DNS, HTTPS and certificate checks | Expanded website and email observations |
+| Basic output | Structured JSON and domain-specific action plans |
+
+| Python tests | JavaScript tests | Python coverage |
+| :---: | :---: | :---: |
+| **317 passed** | **18 passed** | **92%** |
+
+<sub>Local verification on November 27, 2026: two Linux-specific Python tests skipped on Windows. Coverage is rounded and combines statement and branch coverage. Bandit reported no medium/high findings, Gitleaks reported no leaks, and dependency audits reported no known vulnerabilities at the time of testing. See [development and testing](docs/development.md) for reproduction steps.</sub>
+
+### Quick start
+
+Requires Python 3.12 or newer. Run from the repository root:
+
+```sh
+python -m venv .venv
+```
+
+Activate the environment using `.venv\Scripts\Activate.ps1` in Windows PowerShell or `source .venv/bin/activate` on Linux/macOS. Then:
+
+```sh
+python -m pip install .
+python -m domain_guard.web_api
+```
+
+Open **http://127.0.0.1:8000/** in your browser to explore the sample report. Live scans are disabled by default. See the [user guide](docs/usage.md) to enable authorized local scans.
+
+Prefer the terminal?
 
 ```sh
 domainguard example.com
 domainguard --json example.com
-python main.py --help
 ```
 
-Use an ASCII hostname, not a URL, IP address or port. Uppercase and surrounding ordinary spaces are normalized. Internationalized names, trailing dots, control characters and local-use suffixes are not accepted.
+Only check domains you own or have permission to assess.
 
-Both entry points use a supervised scan process with a 25-second wall-clock limit. Live scanning refuses to start with missing or unsupported runtime dependency versions. The JSON option returns exit code 0 for a completed assessment, 1 for incomplete or failed work, and 2 for rejected input or destinations. A completed assessment can still contain negative findings.
+### Repository guide
 
-The engine checks both IPv4 and IPv6 DNS answers before connecting. It rejects prohibited or uncertain destinations, pins connections to an approved address and verifies the requested TLS hostname. HTTP connections are limited to HTTPS on port 443. Certificate names must match a subject alternative name. Redirect targets are described without being followed or resolved, and response bodies are not downloaded.
+| File or directory | Purpose |
+| --- | --- |
+| [`domain_guard/`](domain_guard/) | Assessment engine, network validation, local API and scan workers |
+| [`domain_guard/static/`](domain_guard/static/) | Website, styles, client-side reports, exports and policy pages |
+| [`main.py`](main.py) | Command-line entry point |
+| [`tests/`](tests/) | Offline Python and JavaScript regression and security tests |
+| [`scripts/`](scripts/) | Verification tools and optional Geist font installer |
+| [`requirements.txt`](requirements.txt) | Libraries required to run the application |
+| [`requirements-dev.txt`](requirements-dev.txt) | Runtime libraries plus testing, coverage and security tools |
+| [`pyproject.toml`](pyproject.toml) | Package metadata, dependencies, entry points and test settings |
+| [`SECURITY.md`](SECURITY.md) | Supported operation and private vulnerability reporting |
+| [`.gitignore`](.gitignore) | Excludes environments, caches and generated local files |
+| [`.gitattributes`](.gitattributes) | Consistent text line endings and binary font handling |
+| [`docs/`](docs/) | Usage and developer documentation |
 
-## Local website
+### Security and release status
 
-To use the Geist typeface, run `python scripts/install_geist.py` once from the source directory. This downloads the pinned official Geist package from the npm registry, verifies its published integrity and copies only the variable sans font and its license. The browser serves the font locally; it does not contact an external font provider. If the font is absent, the site uses a system font. Include both files when packaging or deploying the site.
+DomainGuard is a configuration assessment tool, not a penetration test or security certification. The local scanner is restricted to loopback, and live public scanning is not supported. The static website demonstration does not send scanning requests.
 
-```sh
-python -m domain_guard.web_api
-```
+The V2 application is under review. Public live scanning requires separate deployment security and abuse-control verification.
 
-Open `http://127.0.0.1:8000` for the demonstration. To enable local scans, set `DOMAIN_GUARD_LOCAL_SCANS=1` before starting the server. In PowerShell:
+**[Security policy](SECURITY.md)** · [Privacy notice](domain_guard/static/privacy.html) · [Terms of use](domain_guard/static/terms.html) · [Detailed scope](docs/usage.md#assessment-scope)
 
-```powershell
-$env:DOMAIN_GUARD_MODE = "local"
-$env:DOMAIN_GUARD_LOCAL_SCANS = "1"
-python -m domain_guard.web_api
-```
+---
 
-The server binds only to IPv4 loopback, requires its exact host, and rejects cross-origin requests. Live scans are disabled by default and in production mode. Results expire after 15 minutes; the local queue limits concurrent work and the scan subprocess has a cancellation/deadline mechanism and a bounded output pipe. Local HTTP connections have an absolute deadline and a total request-size budget. On Linux the worker also limits its address space, CPU time, open file descriptors and core dumps. Other platforms retain the wall-clock and output limits; process resource limits are not claimed there. Process separation is not a network sandbox. Do not expose this development server through a proxy, tunnel or public interface.
-
-The report includes plain-language findings, optional technical details, a warnings and failures filter, a printable, downloadable action plan with domain-specific filename, responsible provider and verification steps, and JSON export. Example reports are always labelled as sample data.
-
-The `domain_guard/static/` directory also supports a static-only demonstration. Its Vercel configuration does not include a scanning backend. Set the hosting project root to that directory when deploying an approved demo.
-
-## Tests
-
-```sh
-python -m pip install -e ".[dev]"
-python scripts/check_security.py --offline-only
-python scripts/check_security.py
-```
-
-Python tests block external socket connections and DNS lookups in-process, allowing controlled loopback integration tests. The JavaScript tests require Node.js. TLS integration tests use an ephemeral test CA and controlled loopback TLS endpoint; cryptography is a development-only dependency. The full security command requires Bandit and Gitleaks; missing tools cause it to fail. Run `python scripts/check_security.py --dependency-audit` separately when current advisory access is available.
-
-## Scope
-
-DNS checks cover A, AAAA, MX, NS, TXT, CAA and SOA. SPF/DMARC checks identify candidate records, duplicates and limited published policy observations; MTA-STS and SMTP TLS reporting checks discover DNS announcements only. None establishes full policy validity or mail delivery effectiveness. A scan makes at most ten application-level DNS lookups (resolver wire retries may vary) and two TLS connections; A/AAAA observations reuse the addresses screened before connection. Oversized reports preserve bounded data and mark omitted records incomplete. Header observations describe one HTTPS response, not a site's overall security. Only assess domains you are authorized to check. Results may be incomplete when network requests fail or scan limits are reached.
-
-Public live scanning is not supported until separate worker isolation, enforced network egress restrictions, abuse controls and deployment security have been verified.
-
-## Privacy and permitted use
-
-The website includes a privacy notice and terms for the local application and static demonstration. Before public live scanning, verify hosting disclosures, private contact channels, legal requirements and production security. Local scans are limited to authorized domains.
+Developed by [Tarun Puri](https://github.com/PuriiTarun).
