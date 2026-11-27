@@ -5,7 +5,9 @@ const CHECKS = ["https", "tls", "headers", "redirects"];
 const STATES = new Set(["pass", "fail", "info", "warning", "unavailable", "incomplete"]);
 
 export function canRequestHosted(domain, site) {
-    return domain === PILOT_DOMAIN && site.protocol === "https:" && site.hostname.endsWith(".vercel.app") && site.hostname !== PILOT_DOMAIN;
+    if(site.protocol !== "https:" || !normalizeDomain(domain)) return false;
+    if(site.hostname === PILOT_DOMAIN) return true;
+    return domain === PILOT_DOMAIN && site.hostname.endsWith(".vercel.app");
 }
 
 export function mergeHosted(dns, probe) {
@@ -20,7 +22,7 @@ export function mergeHosted(dns, probe) {
     return {
         ...dns, scope: "hosted-combined", status: dns.status === "complete" && probe.status === "complete" ? "complete" : "incomplete",
         addresses: probe.addresses.slice(), checks: {...dns.checks, ...probe.checks},
-        sources: {dns: "Google Public DNS", website: "isolated hosted preview probe"}
+        sources: {dns: "Google Public DNS", website: "isolated hosted website probe"}
     };
 }
 
