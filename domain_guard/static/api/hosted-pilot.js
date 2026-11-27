@@ -4,6 +4,7 @@ import { lookupApproved } from "../hosted-backend/resolve.mjs";
 import { EMBEDDED_WORKERS } from "../hosted-backend/embedded-workers.mjs";
 
 const PILOT_DOMAIN = "domainguard-check.vercel.app";
+const PUBLIC_HOST = "domainguard-check.vercel.app";
 const PREVIEW_HOST = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.vercel\.app$/;
 
 export function createHandler({loadFiles,quota=createQuota,lookup=lookupApproved,createSandbox}={}) {
@@ -16,17 +17,18 @@ export function createHandler({loadFiles,quota=createQuota,lookup=lookupApproved
         res.setHeader("Cache-Control","no-store");
         res.setHeader("X-Content-Type-Options","nosniff");
         res.setHeader("Content-Type","application/json; charset=utf-8");
-        if(process.env.VERCEL_ENV !== "preview" || process.env.DOMAIN_GUARD_PILOT !== "1") {
-            return res.status(404).json({error:"Pilot disabled"});
-        }
+        const publicMode = process.env.VERCEL_ENV === "production" && process.env.DOMAIN_GUARD_PUBLIC === "1";
+        const previewMode = process.env.VERCEL_ENV === "preview" && process.env.DOMAIN_GUARD_PILOT === "1";
+        if(!publicMode && !previewMode) return res.status(404).json({error:"Pilot disabled"});
         if(req.method !== "POST") {
             res.setHeader("Allow","POST");
             return res.status(405).json({error:"Use POST"});
         }
-        // Preview Authentication is the caller boundary; these headers only reject unexpected routing.
-        const host = process.env.VERCEL_URL;
+        // Preview Authentication applies only to preview; headers are not authentication.
+        // Public mode is untrusted and relies on restricted quotas and sandbox isolation.
+        const host = previewMode ? process.env.VERCEL_URL : PUBLIC_HOST;
         const headers = req.headers ?? {};
-        if(typeof host !== "string" || !PREVIEW_HOST.test(host) || host === PILOT_DOMAIN ||
+        if(typeof host !== "string" || (previewMode && (!PREVIEW_HOST.test(host) || host === PILOT_DOMAIN)) ||
            headers.host !== host || headers.origin !== "https://" + host ||
            headers["sec-fetch-site"] !== "same-origin" ||
            headers["content-type"] !== "application/json") {
@@ -40,8 +42,8 @@ export function createHandler({loadFiles,quota=createQuota,lookup=lookupApproved
             return res.status(400).json({error:"Enter a valid public hostname"});
         }
         const allowed = process.env.DOMAIN_GUARD_PILOT_ALLOWLIST;
-        if(allowed !== PILOT_DOMAIN) return res.status(503).json({error:"Pilot authorization unavailable"});
-        if(domain !== PILOT_DOMAIN) return res.status(403).json({error:"Pilot domain not authorized"});
+        if(previewMode && allowed !== PILOT_DOMAIN) return res.status(503).json({error:"Pilot authorization unavailable"});
+        if(previewMode && domain !== PILOT_DOMAIN) return res.status(403).json({error:"Pilot domain not authorized"});
         // Never use the integration's unrestricted shared Redis credential.
         if(process.env.DOMAIN_GUARD_QUOTA_ACL_VERIFIED !== "1" || !process.env.DOMAIN_GUARD_QUOTA_TOKEN || process.env.DOMAIN_GUARD_QUOTA_TOKEN === process.env.UPSTASH_REDIS_REST_TOKEN) {
             return res.status(503).json({error:"Restricted quota credential required"});
@@ -53,7 +55,7 @@ export function createHandler({loadFiles,quota=createQuota,lookup=lookupApproved
             const reserve = quota({url:process.env.UPSTASH_REDIS_REST_URL,token:process.env.DOMAIN_GUARD_QUOTA_TOKEN});
             phase = "admission";
             const result = await runPilot(domain,{
-                authorize:async candidate=>allowed === PILOT_DOMAIN && candidate === PILOT_DOMAIN,
+                authorize:async candidate=>publicMode || (allowed === PILOT_DOMAIN && candidate === PILOT_DOMAIN),
                 reserve:async()=>{
                     phase = "quota-reservation";
                     return reserve();
