@@ -77,6 +77,6 @@ A scan makes at most ten application-level DNS lookups (resolver wire retries ma
 
 Local results expire after 15 minutes. Read the [privacy notice](../domain_guard/static/privacy.html), [terms of use](../domain_guard/static/terms.html) and [security policy](../SECURITY.md) for details.
 
-The `domain_guard/static/` directory supports the [hosted DNS and email mode](hosted.md). Its Vercel configuration does not provide a scanning backend; use that directory as the hosting project root.
+The `domain_guard/static/` directory supports the [public hosted mode](hosted.md): browser-based DNS/email observations and, when the production feature gate and shared quota allow, a limited HTTPS/TLS/header/redirect probe through an isolated Vercel Sandbox. Root and `domain_guard/static/` build layouts are kept compatible.
 
-Full public website connection, TLS and header scanning is not supported. Separate worker isolation, enforced network egress restrictions, abuse controls, hosting disclosures, private contact channels and legal requirements must be verified before such a deployment.
+Hosted website scans inspect one HTTPS HEAD response without following redirects or downloading page bodies. Global capacity is limited to 10 admitted scans per UTC day, 100 per UTC month and one scan every 35 seconds. If a hosted check is unavailable, the DNS and email report remains usable. Deeper assessment is available through the local Python scanner only; keep its server bound to loopback.
