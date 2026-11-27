@@ -15,7 +15,8 @@ if now < day or now >= dayEnd or now < month or now >= monthEnd or d > day or m 
 if d < day then d, dc = day, 0 end
 if m < month then m, mc = month, 0 end
 if dc >= 10 or mc >= 100 or now < next then return 0 end
-redis.call("SET", KEYS[1], string.format("v1:%d:%d:%d:%d:%d", d, dc+1, m, mc+1, now+35), "XX")
+local saved = redis.call("SET", KEYS[1], string.format("v1:%d:%d:%d:%d:%d", d, dc+1, m, mc+1, now+35), "XX")
+if not saved then return 0 end
 return 1
 `;
 
