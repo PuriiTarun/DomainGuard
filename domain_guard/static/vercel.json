@@ -1,16 +1,21 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "buildCommand": "",
-  "installCommand": "",
-  "outputDirectory": ".",
+  "installCommand": "npm ci --ignore-scripts --no-audit --no-fund",
+  "buildCommand": "node hosted-backend/build.mjs",
+  "outputDirectory": "public",
+  "functions": {
+    "api/hosted-pilot.js": {
+      "maxDuration": 45,
+      "includeFiles": "domain_guard/{hosted_probe.py,checks/headers.py,checks/redirects.py,validation.py}"
+    }
+  },
   "headers": [
     {
       "source": "/(.*)",
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src https://dns.google/resolve; img-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+          "value": "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'self' https://dns.google/resolve; img-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
         },
         {
           "key": "Strict-Transport-Security",
