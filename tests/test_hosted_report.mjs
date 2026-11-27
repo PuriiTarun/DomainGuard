@@ -26,7 +26,7 @@ test("same-domain hosted observations merge with DNS and retain export provenanc
     assert.equal(combined.checks.tls.status, "pass");
     assert.equal(combined.sources.website, "isolated hosted website probe");
     assert.equal(exportReport(combined, false).source, "hosted-website");
-    assert.match(actionDocument(combined), /isolated website observations/);
+    assert.match(actionDocument(combined), /isolated HTTPS website observations/);
     const view = describeReport(combined);
     assert.equal(view.groups.find(group => group.name === "HTTPS & TLS").items.length, 4);
 });
