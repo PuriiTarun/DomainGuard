@@ -64,7 +64,7 @@ class ApiHandler(BaseHTTPRequestHandler):
         self.send_header("X-Frame-Options", "DENY")
         self.send_header("Cross-Origin-Opener-Policy", "same-origin")
         self.send_header("Cross-Origin-Resource-Policy", "same-origin")
-        self.send_header("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'")
+        self.send_header("Content-Security-Policy", "default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self'; font-src 'self'; connect-src 'self' https://vitals.vercel-insights.com; img-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'")
         try:
             self.end_headers()
             self.wfile.write(body)
