@@ -57,7 +57,7 @@ export function recommendations(report) {
 export function formatActionPlan(report, synthetic = false) {
     const actions = recommendations(report);
     const domain = typeof report?.domain === "string" ? report.domain.replace(/[^a-zA-Z0-9.-]/g, "?").slice(0, 253) : "Unknown domain";
-    const lines = ["Action plan by DomainGuard", `Domain: ${domain}`, synthetic ? "Source: Example report (not a live scan)" : "Source: Local scan", "", "Configuration observations, not a security certification.", ""];
+    const lines = ["Action plan by DomainGuard", `Domain: ${domain}`, synthetic ? "Source: Example report (not a live scan)" : report?.scope === "dns-email" ? "Source: Live public DNS observations only; HTTPS, TLS and headers not assessed" : "Source: Local scan", "", "Configuration observations, not a security certification.", ""];
     for(const [index, action] of actions.entries()) lines.push(`${index + 1}. ${action.title} (${action.priority})`, action.detail, "");
     if(!actions.length) lines.push("No specific changes were identified. This does not establish that the domain is secure.", "");
     lines.push("Test changes before applying them to a live website or email service.");
